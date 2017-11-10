@@ -100,7 +100,7 @@ void get_sys_size(std::string sysfile, int* nroao, int* nroa, long long int* nro
 /* Read the system data                                                          */
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
-void read_sys(char* sysfile, double* coord, double* charges, double* mass,
+void read_sys(std::string sysfile, double* coord, double* charges, double* mass,
 	      double* Hmat, double* Tmat, double* Smat,  double* Dx, double* Dy,
 	      double *Dz, long long int* sortcount, double* intval,
 	      unsigned short* intnums){
@@ -174,7 +174,7 @@ void read_sys_1el(char* sysfile, double* coord, double* charges, double* mass,
 /* write  HF wave_function                                                       */
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
-void write_wav_HF(char* wavfile, int nroao, double* MOens, double* MOs){
+void write_wav_HF(std::string wavfile, int nroao, double* MOens, double* MOs){
   ofstream outf(wavfile);
 
   outf.write((char *) &nroao, sizeof(int));
@@ -193,7 +193,7 @@ void write_wav_HF(char* wavfile, int nroao, double* MOens, double* MOs){
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
 
-void read_wav_HF(char* wavfile, int nroao, double* MOens, double* MOs){
+void read_wav_HF(std::string wavfile, int nroao, double* MOens, double* MOs){
   ifstream inf(wavfile);
   int real_nroao;
 
