@@ -1,10 +1,13 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <cmath>
 #include "ops_io.h"
 #include "ops_rhf.h"
 #include "ops_mat.h"
 #include "ops_cis.h"
+#include <iomanip>
+
 
 void read_input(std::ifstream* inputfile, std::string* sysfile, int *nroe,int *llim, int *ulim, std::string* wavefile)
 {
@@ -102,9 +105,6 @@ int main(int argc, char const *argv[]) {
   std::cout<< "Nr of atoms                  : " << nroa << "\n";
   std::cout<< "Nr of non zero 2el integrals : " << nrofint << "\n";
   std::cout<< "=======================================\n\n";
-
-
-
 
   //MEMORY ALLOCATION for one electron atoms, mat&vecs
   int atom_ao_mem = 5*nroa+14*nroao*nroao+3*nroao;
@@ -211,20 +211,125 @@ int main(int argc, char const *argv[]) {
     int mu = 0;
     int nu = 0;
     double* HMo = new double[nroao*nroao];
+    double* GMo = new double[nroao*nroao];
+    double* FMo = new double[nroao*nroao];
+    for (size_t i = 0; i < nroao*nroao; i++){
+                HMo[i] = 0.0;
+                GMo[i] = 0.0;
+                FMo[i] = 0.0;
+    }
+
     for (int i = 0; i < nroao; i++) {
       for (int j = 0; j < nroao; j++) {
         for (int mu = 0; mu < nroao; mu++) {
           for (int nu = 0; nu < nroao; nu++) {
             HMo[i*nroao + j] += MOs[i*nroao + mu] * Hmat[mu*nroao + nu] * MOs[j*nroao + nu];
+
           }
         }
       }
     }
+
+    for (int i = 0; i < nroao; i++) {
+      for (int j = 0; j < nroao; j++) {
+        for (int k = 0; k < nroe/2; k++) {
+          GMo[i*nroao + j] += (2*prec_ints[k*istep + k*jstep + i*kstep + j]
+                                -prec_ints[k*istep + i*jstep + k*kstep + j]);
+        }
+      }
+    }
+
+    for (int i = 0; i < nroao; i++) {
+      for (int j = 0; j < nroao; j++) {
+        FMo[i*nroao + j] = HMo[i*nroao + j] + GMo[i*nroao + j];
+      }
+    }
+
+
+    std::cout << "\nCalculating semi-canonical amplitudes ... ";
+    int nocc = nroe/2;
+    int nvir = nroao - nocc;
+    double* T_ijab   = new double[nocc*nocc*nvir*nvir];
+    int Ti,Tj,Ta,Tb = 0;
+    int Ta_step = nvir;
+    int Tj_step = Ta_step * nvir;
+    int Ti_step = Tj_step * nocc;
+
+    for (Ti = 0; Ti < nocc; Ti++) {
+      for (Tj = 0; Tj < nocc; Tj++) {
+        for (Ta = 0; Ta < nvir; Ta++) {
+          for (Tb = 0; Tb < nvir; Tb++) {
+            T_ijab[Ti*Ti_step + Tj*Tj_step + Ta*Ta_step + Tb] = - prec_ints[Ti * istep + (Ta+nocc)*jstep  + Tj*kstep + (Tb+nocc)] /
+                                                                  (FMo[(nocc+Ta)*nroao + (nocc+Ta)] + FMo[(nocc+Tb)*nroao + (nocc+Tb)] - FMo[Ti*nroao + Ti] - FMo[Tj*nroao + Tj]);
+
+          }
+        }
+      }
+    }
+    std::cout << "done" << '\n';
+    double* G_ijab   = new double[nocc*nocc*nvir*nvir];
+    double* R_ijab   = new double[nocc*nocc*nvir*nvir];
+
+    for (size_t iter = 0; iter < 20; iter++) {
+      for (Ti = 0; Ti < nocc; Ti++) {
+        for (Tj = 0; Tj < nocc; Tj++) {
+          for (Ta = 0; Ta < nvir; Ta++) {
+            for (Tb = 0; Tb < nvir; Tb++) {
+              G_ijab[Ti*Ti_step + Tj*Tj_step + Ta*Ta_step + Tb] = 0.0;
+              for (int k = 0; k < nocc; k++) {
+                if (k!=Ti){
+                  G_ijab[Ti*Ti_step + Tj*Tj_step + Ta*Ta_step + Tb] +=  -FMo[Ti*nroao + k] * T_ijab[k*Ti_step + Tj*Tj_step + Ta*Ta_step + Tb];
+                }
+              }
+            }
+          }
+        }
+      }
+
+
+      double Rsum = 0.0;
+      for (Ti = 0; Ti < nocc; Ti++) {
+        for (Tj = 0; Tj < nocc; Tj++) {
+          for (Ta = 0; Ta < nvir; Ta++) {
+            for (Tb = 0; Tb < nvir; Tb++) {
+              R_ijab[Ti*Ti_step + Tj*Tj_step + Ta*Ta_step + Tb] = prec_ints[Ti * istep + (Ta+nocc)*jstep  + Tj*kstep + (Tb+nocc)] +
+                                                                (FMo[(nocc+Ta)*nroao + (nocc+Ta)] + FMo[(nocc+Tb)*nroao + (nocc+Tb)] - FMo[Ti*nroao + Ti] - FMo[Tj*nroao + Tj])*T_ijab[Ti*Ti_step + Tj*Tj_step + Ta*Ta_step + Tb]+
+                                                                G_ijab[Ti*Ti_step + Tj*Tj_step + Ta*Ta_step + Tb] +
+                                                                G_ijab[Tj*Ti_step + Ti*Tj_step + Tb*Ta_step + Ta];
+              Rsum += fabs(R_ijab[Ti*Ti_step + Tj*Tj_step + Ta*Ta_step + Tb]);
+          }
+        }
+      }
+    }
+    double E = 0.0;
+    for (Ti = 0; Ti < nocc; Ti++) {
+      for (Tj = 0; Tj < nocc; Tj++) {
+        for (Ta = 0; Ta < nvir; Ta++) {
+          for (Tb = 0; Tb < nvir; Tb++) {
+            E +=  (prec_ints[Ti * istep + (Ta+nocc)*jstep  + Tj*kstep + (Tb+nocc)] + R_ijab[Ti*Ti_step + Tj*Tj_step + Ta*Ta_step + Tb])* (2 * T_ijab[Ti*Ti_step + Tj*Tj_step + Ta*Ta_step + Tb] -T_ijab[Ti*Ti_step + Tj*Tj_step + Tb*Ta_step + Ta]);
+          }
+        }
+      }
+    }
+
+    for (Ti = 0; Ti < nocc; Ti++) {
+      for (Tj = 0; Tj < nocc; Tj++) {
+        for (Ta = 0; Ta < nvir; Ta++) {
+          for (Tb = 0; Tb < nvir; Tb++) {
+              T_ijab[Ti*Ti_step + Tj*Tj_step + Ta*Ta_step + Tb] += - R_ijab[Ti*Ti_step + Tj*Tj_step + Ta*Ta_step + Tb]/(FMo[(nocc+Ta)*nroao + (nocc+Ta)] + FMo[(nocc+Tb)*nroao + (nocc+Tb)] - FMo[Ti*nroao + Ti] - FMo[Tj*nroao + Tj]);
+          }
+        }
+      }
+    }
+    std::cout <<std::fixed<<std::setw( 10 )<<std::setprecision(10)<<"E(sem-loc):" <<std::setw( 16 ) <<E<<'\t' << "Rsum:" << Rsum <<'\n';
+  }
+
+    //Hartree-Fock
     for (size_t i = 0; i < nroe/2; i++) {
       oneE += 2 * HMo[i*nroao + i];
     }
     oneE += ion_rep;
-    std::cout << "oneE: " <<oneE<<'\n';
+    std::cout<<std::setw( 10 )<< "oneE:" <<std::setw( 16 )<<oneE<<'\n';
 
     for (size_t i = 0; i < nroe/2; i++) {
       for (size_t j = 0; j < nroe/2; j++) {
@@ -233,11 +338,14 @@ int main(int argc, char const *argv[]) {
 
       }
     }
-    std::cout << "twoE:" <<twoE<< '\n';
-    std::cout << "HF  :"  <<oneE+twoE<<'\n';
+    std::cout << std::setw( 10 ) << "twoE:" <<std::setw( 16 )<<twoE<< '\n';
+    std::cout << std::setw( 10 ) << "HF  :" <<std::setw( 16 )<<oneE+twoE<<'\n';
+    ///END Hartree-Fock
 
     //calculate canonical MP2:
     double EMP2 = 0.0;
+    double EMP2_SS = 0.0;
+    double EMP2_OS = 0.0;
     double* eps = new double[nroao];
     for (int i = 0; i < nroao; i++) {
       eps[i] = HMo[i*nroao + i];
@@ -246,22 +354,22 @@ int main(int argc, char const *argv[]) {
         eps[i]+=(2 *prec_ints[j*istep + j*jstep + i*kstep + i]
                  - prec_ints[j*istep + i*jstep + j*kstep + i]);
       }
-      std::cout << "eps" <<i<<":"<<eps[i]<< '\n';
-      /* code */
     }
 
     for (int i = 0; i < nroe/2; i++) {
       for (int j = 0; j < nroe/2; j++) {
         for (int a = nroe/2; a < nroao; a++) {
           for (int b = nroe/2;  b < nroao; b++) {
-            EMP2 += - (prec_ints[i*istep + a*jstep + j*kstep + b]*(prec_ints[i*istep + a*jstep + j*kstep + b]))/ (eps[a]+eps[b]-eps[i]-eps[j]);
-            EMP2 += - (prec_ints[i*istep + a*jstep + j*kstep + b] - prec_ints[i*istep + b*jstep + j*kstep + a])*prec_ints[i*istep + a*jstep + j*kstep + b]/(eps[a]+eps[b]-eps[i]-eps[j]);
+            EMP2_SS += - (prec_ints[i*istep + a*jstep + j*kstep + b]*(prec_ints[i*istep + a*jstep + j*kstep + b]))/ (eps[a]+eps[b]-eps[i]-eps[j]);
+            EMP2_OS += - (prec_ints[i*istep + a*jstep + j*kstep + b] - prec_ints[i*istep + b*jstep + j*kstep + a])*prec_ints[i*istep + a*jstep + j*kstep + b]/(eps[a]+eps[b]-eps[i]-eps[j]);
           }
         }
       }
     }
-
-    std::cout << "EMP2:" <<EMP2<< '\n';
+    EMP2 = EMP2_OS + EMP2_SS;
+    std::cout <<std::setw( 10 ) << "EMP2_SS:" <<std::setw( 16 )<<EMP2_SS<< '\n';
+    std::cout <<std::setw( 10 ) << "EMP2_OS:" <<std::setw( 16 )<<EMP2_OS<< '\n';
+    std::cout <<std::setw( 10 ) << "EMP2:"    <<std::setw( 16 )<<EMP2<< '\n';
 
 
 
