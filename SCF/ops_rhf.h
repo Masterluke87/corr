@@ -14,3 +14,5 @@ void   build_Fmat(int nroao, double* Fmat, double* Pmat, double* Hmat,
 		  long long int* sortcount, long long int nrofint);
 double Calc_e_el(int nroao, double* Fmat, double* Pmat, double* Hmat);
 double calc_op_1el(int nroao, double* opmat, double* Pmat);
+double build_Pmat_dscf(int nroao, int nroe, double* Pmat, double* Pmat_old,
+		       double* MOs, double damp);

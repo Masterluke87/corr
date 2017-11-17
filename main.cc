@@ -1,13 +1,14 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <string>
 #include <cmath>
 #include "ops_io.h"
-#include "ops_rhf.h"
+#include "SCF/ops_rhf.h"
+#include "SCF/scf.h"
 #include "ops_mat.h"
 #include "ops_cis.h"
 #include <iomanip>
-
 
 void read_input(std::ifstream* inputfile, std::string* sysfile, int *nroe,int *llim, int *ulim, std::string* wavefile)
 {
@@ -86,11 +87,12 @@ int main(int argc, char const *argv[]) {
 
   double* prec_ints;
 
+  //auto mymol  = psi::molecule::
 
   std::string sysfile;
   std::string wavefile;
-  std::cout<<"PSI4/MP2 Program \n";
 
+  std::cout<<"PSI4-MPI Program \n";
   if(argc != 3){
     std::cerr << "Need input-file output-prefix\n";
     exit(1);
@@ -136,34 +138,20 @@ int main(int argc, char const *argv[]) {
   std::cout << "Minimal eigenvalue of S is " << calc_S12( nroao, Smat, Som12, tmpmat1, tmpvecs, tmpvals) <<"\n";
 
   read_wav_HF(wavefile, nroao, MOens, MOs);
-   std::cout<< "HF-wave function  read from " << wavefile << "\n";
+  std::cout<< "HF-wave function  read from " << wavefile << "\n";
 
-   std::cout << "Testing for orthonormal MOs\n";
-    for(int x = 0; x < nroao; x++)
-      pmv(Smat, &(MOs[x*nroao]), &(tmpvecs[x*nroao]), nroao);
-    double max_err = 0.;
-    int mx, my;
-    for(int x = 0; x < nroao; x++){
-      for(int y = x+1; y < nroao; y++){
-        double ov = 0.;
-        for(int z = 0; z < nroao; z++) ov += MOs[x*nroao+z]*tmpvecs[y*nroao+z];
-        if(fabs(ov) > max_err){
-  	max_err = fabs(ov);
-  	mx = x;
-  	my = y;
-        }
-      }
-    }
-    std::cout << "Maximal overlap is " << max_err << " for " << mx << " , " << my << "\n";
+  for (size_t x = 0; x < nroao*nroao; x++) {
+    Fmat[x] = Hmat[x];
+  }
+  run_scf(nroao,nroe,MOs,Pmat,Hmat,Fmat,intnums,intval,sortcount,nrofint,Som12,100,ion_rep);
 
-    max_err = 0.;
-    for(int x = 0; x < nroao; x++){
-      double ov = 0.;
-      for(int z = 0; z < nroao; z++) ov += MOs[x*nroao+z]*tmpvecs[x*nroao+z];
-      if(fabs(ov-1.) > max_err) max_err = fabs(ov-1.);
-    }
-    std::cout << "Maximal norm deviation is " << max_err << "\n";
 
+
+
+
+    //
+    //  TRAFO
+    //
     std::cout << "Precalculating <oo|oo> up to <ov|vv>\n";
     std::cout << nroe << '\n';
     std::cout << nroe/2 << '\n';
@@ -203,8 +191,9 @@ int main(int argc, char const *argv[]) {
       if((i+1)%10==0) std::cout << "\n"<<std::flush;
     }
 
+    //
     //calculate the Hartree-Fock energy:
-
+    //
     double E_hf = 0.0;
     double oneE = 0.0;
     double twoE = 0.0;
@@ -245,7 +234,7 @@ int main(int argc, char const *argv[]) {
       }
     }
 
-
+/*
     std::cout << "\nCalculating semi-canonical amplitudes ... ";
     int nocc = nroe/2;
     int nvir = nroao - nocc;
@@ -323,7 +312,7 @@ int main(int argc, char const *argv[]) {
     }
     std::cout <<std::fixed<<std::setw( 10 )<<std::setprecision(10)<<"E(sem-loc):" <<std::setw( 16 ) <<E<<'\t' << "Rsum:" << Rsum <<'\n';
   }
-
+*/
     //Hartree-Fock
     for (size_t i = 0; i < nroe/2; i++) {
       oneE += 2 * HMo[i*nroao + i];
@@ -341,7 +330,7 @@ int main(int argc, char const *argv[]) {
     std::cout << std::setw( 10 ) << "twoE:" <<std::setw( 16 )<<twoE<< '\n';
     std::cout << std::setw( 10 ) << "HF  :" <<std::setw( 16 )<<oneE+twoE<<'\n';
     ///END Hartree-Fock
-
+/*
     //calculate canonical MP2:
     double EMP2 = 0.0;
     double EMP2_SS = 0.0;
@@ -370,7 +359,7 @@ int main(int argc, char const *argv[]) {
     std::cout <<std::setw( 10 ) << "EMP2_SS:" <<std::setw( 16 )<<EMP2_SS<< '\n';
     std::cout <<std::setw( 10 ) << "EMP2_OS:" <<std::setw( 16 )<<EMP2_OS<< '\n';
     std::cout <<std::setw( 10 ) << "EMP2:"    <<std::setw( 16 )<<EMP2<< '\n';
-
+*/
 
 
 
