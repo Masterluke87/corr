@@ -1,1 +1,0 @@
-/usr/bin/c++   -fopenmp    CMakeFiles/mp2.dir/main.cc.o CMakeFiles/mp2.dir/ops_cis.cc.o CMakeFiles/mp2.dir/ops_io.cc.o CMakeFiles/mp2.dir/ops_mat.cc.o CMakeFiles/mp2.dir/SCF/ops_rhf.cc.o CMakeFiles/mp2.dir/SCF/scf.cc.o  -o mp2 -lblas -llapack -lcblas 
