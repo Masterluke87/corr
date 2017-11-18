@@ -1,3 +1,0 @@
-/home/luke/Projects/MP2_Project/corr/build/CMakeFiles/rebuild_cache.dir
-/home/luke/Projects/MP2_Project/corr/build/CMakeFiles/mp2.dir
-/home/luke/Projects/MP2_Project/corr/build/CMakeFiles/edit_cache.dir
