@@ -5,3 +5,7 @@ MYTEST.*
 cmake_install.cmake
 *.gch
 build/
+syshfwplug/CMakeFiles/
+syshfwplug/__init__.pyc
+syshfwplug/pymodule.pyc
+syshfwplug/pymodule.py~
