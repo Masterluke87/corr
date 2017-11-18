@@ -4,3 +4,4 @@ mp2
 MYTEST.*
 cmake_install.cmake
 *.gch
+build/

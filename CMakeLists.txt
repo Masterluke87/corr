@@ -11,7 +11,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
 endif()
 
-add_executableTR(mp2 main.cc
+add_executable(mp2 main.cc
       		    MOTRANS/ops_cis.cc
 		          IO/ops_io.cc
 		          MATH/ops_mat.cc
