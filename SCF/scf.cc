@@ -3,9 +3,7 @@
 #include <sstream>
 #include <iomanip>
 #include <cmath>
-#include <cblas.h>
 #include <omp.h>
-
 #include "ops_rhf.h"
 
 extern "C"
