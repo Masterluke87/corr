@@ -1,13 +1,3 @@
-/********************************************************************************
- * CIS3(D) Program suite                                                        *
- *                                                                              *
- * file: ops_io.cc                                                              *
- *                                                                              *
- * contains io routines                                                         *
- *                                                                              *
- *                                                    Tillmann Klamroth  2005   *
- ********************************************************************************/
-
 #include <fstream>
 #include <math.h>
 #include <limits.h>

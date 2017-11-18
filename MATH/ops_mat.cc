@@ -1,13 +1,3 @@
-/********************************************************************************
- * CIS3(D) Program suite                                                        *
- *                                                                              *
- * file: ops_mat.cc                                                             *
- *                                                                              *
- * contains functions for matrx operations                                     *
- *                                                                              *
- *                                                    Tillmann Klamroth  2005   *
-
- ********************************************************************************/
 #include <math.h>
 #include <stdlib.h>
 #include <iostream>

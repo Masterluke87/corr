@@ -1,12 +1,3 @@
-/********************************************************************************
- * CIS3(D) Program suite                                                        *
- *                                                                              *
- * file: ops_rhf.cc                                                             *
- *                                                                              *
- * contains functions for (time indepentend)  operations  needed for RHF        *
- *                                                                              *
- *                                                    Tillmann Klamroth  2004   *
- ********************************************************************************/
 #include <math.h>
 #include <iostream>
 #include <stdlib.h>

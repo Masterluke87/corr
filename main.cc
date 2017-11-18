@@ -3,11 +3,11 @@
 #include <sstream>
 #include <string>
 #include <cmath>
-#include "ops_io.h"
+#include "IO/ops_io.h"
 #include "SCF/ops_rhf.h"
 #include "SCF/scf.h"
-#include "ops_mat.h"
-#include "ops_cis.h"
+#include "MATH/ops_mat.h"
+#include "MOTRANS/ops_cis.h"
 #include <iomanip>
 
 void read_input(std::ifstream* inputfile, std::string* sysfile, int *nroe,int *llim, int *ulim, std::string* wavefile)

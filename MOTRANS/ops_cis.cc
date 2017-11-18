@@ -1,13 +1,3 @@
-/********************************************************************************
- * CIS3(D) Program suite                                                        *
- *                                                                              *
- * file: ops_cis.cc                                                             *
- *                                                                              *
- * contains functions for especially needed for cis calculations                *
- *                                                                              *
- *                                                    Tillmann Klamroth  2004   *
- ********************************************************************************/
-
 #include <math.h>
 #include <stdlib.h>
 #include <iostream>
