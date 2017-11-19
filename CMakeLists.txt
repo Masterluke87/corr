@@ -17,4 +17,5 @@ add_executable(mp2 main.cc
 		          MATH/ops_mat.cc
 		          SCF/ops_rhf.cc
 		          SCF/scf.cc )
-target_link_libraries(mp2 blas lapack cblas)
+
+target_link_libraries(mp2 ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES} )

@@ -74,7 +74,7 @@ int rem_com(char* filename, char* streamstring, int string_length){
 
 void get_sys_size(std::string sysfile, int* nroao, int* nroa, long long int* nrofint){
 
-  ifstream inf(sysfile);
+  ifstream inf(sysfile.c_str());
 
   inf.read((char *) nroao,   sizeof(int));
   inf.read((char *) nroa,    sizeof(int));
@@ -94,7 +94,7 @@ void read_sys(std::string sysfile, double* coord, double* charges, double* mass,
 	      double* Hmat, double* Tmat, double* Smat,  double* Dx, double* Dy,
 	      double *Dz, long long int* sortcount, double* intval,
 	      unsigned short* intnums){
-  ifstream datf(sysfile);
+  ifstream datf(sysfile.c_str());
 
   int nroao, nroa;
   long long int nrofint;
@@ -165,7 +165,7 @@ void read_sys_1el(char* sysfile, double* coord, double* charges, double* mass,
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
 void write_wav_HF(std::string wavfile, int nroao, double* MOens, double* MOs){
-  ofstream outf(wavfile);
+  ofstream outf(wavfile.c_str());
 
   outf.write((char *) &nroao, sizeof(int));
   outf.write((char *) MOens,  sizeof(double)*nroao);
@@ -184,7 +184,7 @@ void write_wav_HF(std::string wavfile, int nroao, double* MOens, double* MOs){
 
 
 void read_wav_HF(std::string wavfile, int nroao, double* MOens, double* MOs){
-  ifstream inf(wavfile);
+  ifstream inf(wavfile.c_str());
   int real_nroao;
 
   inf.read((char *) &real_nroao, sizeof(int));

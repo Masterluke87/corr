@@ -3,19 +3,19 @@
 #include <iostream>
 #include <complex>
 #include <string.h>
-#include "cblas.h"
+#include "mkl.h"
 #include "ops_mat.h"
 
-using namespace std;
+
 
 
 //Functions
 
 //Extern Functions
-extern "C" void  dsyev_(char* JOBZ, char*  UPLO,int* N, double* A, int* LDA,
-                        double* W, double* WORK, int* LWORK, int*  INFO );
-extern "C" void  zheev_(char* JOBZ, char* UPLO, int* N, Complex* A, int* LDA,
-			double* W, Complex* WORK, int* LWORK, double* RWORK, int* INFO);
+//extern "C" void  dsyev_(char* JOBZ, char*  UPLO,int* N, double* A, int* LDA,
+//                        double* W, double* WORK, int* LWORK, int*  INFO );
+//extern "C" void  zheev_(char* JOBZ, char* UPLO, int* N, ComPlex* A, int* LDA,
+//			double* W, Complex* WORK, int* LWORK, double* RWORK, int* INFO);
 
 /*******************************************************************************
  * Matrix diagonalization                                                      *
@@ -163,46 +163,6 @@ void mat_T_mat(long long int np, double* mat_i1, double* mat_i2, double* mat_f){
 }
 
 
-/*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
-/*                     SIMPLE MATRIX ROUTINES   (COMPLEX)                        */
-/*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
-
-void mat_mat(int np, Complex* mat_i1, Complex* mat_i2, Complex* mat_f){
-  for(int x = 0; x < np; x++){
-    for(int y = 0; y < np; y++){
-      mat_f[x*np+y] = 0.;
-      for(int z = 0; z < np; z++){
-        mat_f[x*np+y] += mat_i1[x*np+z]*mat_i2[z*np+y];
-      }
-    }
-  }
-}
-
-
-void mat_mat_T(int np, Complex* mat_i1, Complex* mat_i2, Complex* mat_f){
-  for(int x = 0; x < np; x++){
-    for(int y = 0; y < np; y++){
-      mat_f[x*np+y] = 0.;
-      for(int z = 0; z < np; z++){
-        mat_f[x*np+y] += mat_i1[x*np+z]*mat_i2[y*np+z];
-      }
-    }
-  }
-}
-
-
-void mat_T_mat(int np, Complex* mat_i1, Complex* mat_i2, Complex* mat_f){
-  for(int x = 0; x < np; x++){
-    for(int y = 0; y < np; y++){
-      mat_f[x*np+y] = 0.;
-      for(int z = 0; z < np; z++){
-        mat_f[x*np+y] += mat_i1[z*np+x]*mat_i2[z*np+y];
-      }
-    }
-  }
-}
-
-
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 /*                     BASIS TRANSFORMAITIONS                                    */
@@ -244,78 +204,7 @@ void trans_mat(long long int np, double* mat, double* trans, double* tmpmat, int
 }
 
 
-/*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
-/*                     BASIS TRANSFORMAITIONS (COMPLEX)                          */
-/*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
-// FOR ALL ROUTINES
-// DIR = 1 means:   mat = trans * mat * trans^T
-// else             mat = trans^T*mat*trans
 
-
-void trans_mat(int np, Complex* mat, Complex* trans, Complex* tmpmat, int dir){
-
-  if(dir == 0) //CALC mat*trans
-    mat_mat( np,  mat,trans, tmpmat);
-  else         //CALC trans*mat
-    mat_mat( np, trans, mat, tmpmat);
-
-
-  if(dir == 0) //CALC trans^T*(mat*trans)
-    mat_T_mat( np, trans, tmpmat, mat);
-  else         //CALC (trans*mat)*trans^T
-    mat_mat_T( np, tmpmat, trans, mat);
-
-}
-
-/*******************************************************************************
- * transformations for symmtric orhtogonalization         (td hf)             *
- *                                                                             *
- ******************************************************************************/
-
-void   symortho_mat(int nroao, Complex* mat,  double *tmat, Complex* dummat){
-  for(int x = 0; x  < nroao; x++){
-    for(int y = 0; y < nroao;y++){
-      dummat[x*nroao+y] = 0.;
-      for(int z = 0; z < nroao; z++)
-        dummat[x*nroao+y] += tmat[x*nroao+z] * mat[z*nroao+y];
-    }
-  }
-  for(int x = 0; x  < nroao; x++){
-    for(int y = 0; y < nroao;y++){
-      mat[x*nroao+y] = 0.;
-      for(int z = 0; z < nroao; z++)
-        mat[x*nroao+y] += tmat[z*nroao+y] * dummat[x*nroao+z];
-    }
-  }
-}
-
-void symortho_MOs(int nroao,int nroe, Complex* MOs, double* tmat, Complex* dumvec){
-  for(int x = 0; x < nroe/2;x++){
-    for(int y = 0; y < nroao; y++){
-      dumvec[y] = 0.;
-      for(int z = 0; z < nroao; z++){
-        dumvec[y] += tmat[y*nroao+z]*MOs[x*nroao+z];
-      }
-    }
-    for(int y = 0; y < nroao; y++)
-      MOs[x*nroao+y] = dumvec[y];
-  }
-}
-
-
-/*******************************************************************************
- *Complex vectro matrix operations td                                          *
- *                                                                             *
- ******************************************************************************/
-
-
-void pmv(double* mat, Complex* vi, Complex* vo, int nroao){
-  for(int x = 0; x < nroao; x++){
-    vo[x] = 0.;
-    for(int y = 0; y < nroao; y++)
-      vo[x] += mat[x*nroao+y]*vi[y];
-  }
-}
 
 void pmv(double* mat, double* vi, double* vo, int nroao){
   for(int x = 0; x < nroao; x++){
@@ -325,35 +214,3 @@ void pmv(double* mat, double* vi, double* vo, int nroao){
   }
 }
 
-/*******************************************************************************
- * Hermitian Matrix diagonalization                                            *
- *                                                                             *
- ******************************************************************************/
-
-void   diag_matH(int nroao, Complex* mat, double* vals, Complex* vecs){
-   static int N = -1 ;
-   static Complex* WORK;
-   static double*  RWORK;
-
-   int LDA = nroao, LWORK=3*nroao-1, INFO;
-
-   if(N != nroao){
-     if(WORK != NULL){
-       delete [] WORK;
-       delete [] RWORK;
-     }
-
-     WORK = new Complex[LWORK];
-     RWORK = new double[4*nroao+2];
-     N = nroao;
-   }
-
-   char JOBZ, UPLO;
-   double* W    = vals;
-   JOBZ = 'V';
-   UPLO = 'U';
-
-   for(int x = 0; x <  nroao*nroao; x++)
-     vecs[x] = mat[x];
-   zheev_(&JOBZ, &UPLO,  &N, vecs, &LDA, W, WORK, &LWORK, RWORK, &INFO);
-}
