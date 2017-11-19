@@ -6,7 +6,6 @@
 #include "IO/ops_io.h"
 #include "SCF/ops_rhf.h"
 #include "SCF/scf.h"
-#include "MATH/ops_mat.h"
 #include "MOTRANS/ops_cis.h"
 #include <iomanip>
 

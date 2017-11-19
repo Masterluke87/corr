@@ -3,7 +3,6 @@
 #include <iostream>
 #include <complex>
 #include <string.h>
-#include "mkl.h"
 #include "ops_mat.h"
 
 
@@ -12,10 +11,8 @@
 //Functions
 
 //Extern Functions
-//extern "C" void  dsyev_(char* JOBZ, char*  UPLO,int* N, double* A, int* LDA,
-//                        double* W, double* WORK, int* LWORK, int*  INFO );
-//extern "C" void  zheev_(char* JOBZ, char* UPLO, int* N, ComPlex* A, int* LDA,
-//			double* W, Complex* WORK, int* LWORK, double* RWORK, int* INFO);
+extern "C" void  dsyev_(char* JOBZ, char*  UPLO,int* N, double* A, int* LDA,
+                        double* W, double* WORK, int* LWORK, int*  INFO );
 
 /*******************************************************************************
  * Matrix diagonalization                                                      *
@@ -93,12 +90,6 @@ void transform_MOs(int nroao, double *MOs, double* tmat, double* tmpvec){
 /*                     SIMPLE MATRIX ROUTINES                                    */
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
-void mat_mat(int np, double* mat_i1, double* mat_i2, double* mat_f){
-  cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
-                np, np, np, 1.0, mat_i1,np, mat_i2, np, 0.0, mat_f, np);
-
-}
-
 
 void mat_mat_T(int np, double* mat_i1, double* mat_i2, double* mat_f){
   int x,y,z;
@@ -127,12 +118,6 @@ void mat_T_mat(int np, double* mat_i1, double* mat_i2, double* mat_f){
   }
 }
 
-//For large matrices
-void mat_mat(long long int np, double* mat_i1, double* mat_i2, double* mat_f){
-  long long int x,y,z;
-  cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
-                np, np, np, 1.0, mat_i1,np, mat_i2, np, 0.0, mat_f, np);
-}
 
 
 void mat_mat_T(long long int np, double* mat_i1, double* mat_i2, double* mat_f){
@@ -171,7 +156,7 @@ void mat_T_mat(long long int np, double* mat_i1, double* mat_i2, double* mat_f){
 // DIR = 1 means:   mat = trans * mat * trans^T
 // else             mat = trans^T*mat*trans
 
-
+/*
 void trans_mat(int np, double* mat, double* trans, double* tmpmat, int dir){
 
   if(dir == 0) //CALC mat*trans
@@ -186,8 +171,9 @@ void trans_mat(int np, double* mat, double* trans, double* tmpmat, int dir){
     mat_mat_T( np, tmpmat, trans, mat);
 
 }
-
+*/
 // For large matrices
+/*
 void trans_mat(long long int np, double* mat, double* trans, double* tmpmat, int dir){
 
   if(dir == 0) //CALC mat*trans
@@ -202,9 +188,7 @@ void trans_mat(long long int np, double* mat, double* trans, double* tmpmat, int
     mat_mat_T( np, tmpmat, trans, mat);
 
 }
-
-
-
+*/
 
 void pmv(double* mat, double* vi, double* vo, int nroao){
   for(int x = 0; x < nroao; x++){
