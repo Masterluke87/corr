@@ -168,6 +168,7 @@ SharedWavefunction syshfwplug(SharedWavefunction ref_wfn, Options &options)
     long long int sortcount[4];  //boundaries for different permutation patterns;
     int nroao = aoBasis->nbf();
     int nroa  = molecule->natom();
+    int nroe  = ref_wfn->nalpha() + ref_wfn->nbeta();
 
     double*              intval;        //two electron integrals
     unsigned short int*  intnums;       //two electron indecies
@@ -287,6 +288,7 @@ SharedWavefunction syshfwplug(SharedWavefunction ref_wfn, Options &options)
       std::clog << "Center of mass   is " << com[0] << " " << com[1] << " " << com[2] << "\n";
       
       //SYSTEM DATA
+      datf.write((char *) &nroe  , sizeof(int));
       datf.write((char *) &nroao , sizeof(int));
       datf.write((char *) &nroa  , sizeof(int));
       datf.write((char *) &nrofint,  sizeof(long long int));

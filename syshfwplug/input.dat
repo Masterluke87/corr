@@ -24,12 +24,14 @@ set syshfwplug {
   print 1
 }
 
-set scf reference rhf
+set scf reference uhf
 set scf_type pk
 set scf PRINT_MOS  true
 
 
 e_scf,ref_wfn = energy('scf',return_wfn=True)
+
+ref_wfn.Da().print_out()
 
 plugin("syshfwplug.so", ref_wfn)
 #syshfwplug.exampleFN(ref_wfn)

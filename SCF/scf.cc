@@ -23,9 +23,9 @@ void build_Pmat(double *C,int nroao, int nroe, double *Pmat,double damp)
   double c = 0.0;
   double PmatOld[nroao*nroao];
 
-  //for (int i = 0; i < nroao*nroao; i++) {
-  //  PmatOld[i] = Pmat[i];
-  //}
+  for (int i = 0; i < nroao*nroao; i++) {
+    PmatOld[i] = Pmat[i];
+  }
   std::memcpy(PmatOld,Pmat,nroao*nroao*sizeof(double));
 
   dgemm_("N","T",&nroao,&nroao,&nocc,
@@ -71,23 +71,30 @@ double oneE(int nroao, double* Pmat, double* Hmat){
 void run_scf(int nroao,int nroe, double* C, double* Pmat,double* Hmat,double* Fmat,
             unsigned short* intnums, double* intvals, long long int* sortcount,
             long long int nrofint, double* Som12, int maxiter,double ion_rep){
-  std::cout << "**SCF::run_scf**" << '\n';
+  std::cout << "+++++++++++SCF++++++++++" << '\n';
+  
+
   double* tmpmat = new double[nroao*nroao];
-  double MOens [nroao];
-  double Escf = 0.0;
-  double DE   = 10.0;
-  double Eold = 0.0;
-  double damp = 0.5;
+  double* MOens  = new double [nroao];
+  double Escf  = 0.0;
+  double DE    = 10.0;
+  double Eold  = 0.0;
+  double damp  = 0.5;
   double start = 0.0;
-  double end  = 0.0;
+  double end   = 0.0;
   int iter=0;
   std::cout<<std::fixed<<std::setprecision(10);
   std::cout<<std::setw(-4)<<"Iter"<<std::setw( 16 )<<"ESCF" << std::setw( 16 )<<"DE"<<std::setw( 16 )<<"t[s]"<<"\n";
   while (iter  < maxiter && std::fabs(DE)>1E-8) {
     start = omp_get_wtime();
+    //with guess
     build_Pmat(C,nroao,nroe,Pmat,damp);
     diag_Fmat(nroao, Fmat,C,MOens,Som12, tmpmat);
     build_Fmat(nroao,Fmat,Pmat,Hmat,intvals,intnums,sortcount,nrofint);
+
+    // build_Pmat(C,nroao,nroe,Pmat,damp);
+    // build_Fmat(nroao,Fmat,Pmat,Hmat,intvals,intnums,sortcount,nrofint);
+    // diag_Fmat(nroao, Fmat,C,MOens,Som12, tmpmat);
     Escf = Calc_e_el(nroao,Fmat,Pmat,Hmat);
     DE = Escf - Eold;
     Eold = Escf;
@@ -97,7 +104,7 @@ void run_scf(int nroao,int nroe, double* C, double* Pmat,double* Hmat,double* Fm
     iter++;
 }
 
-
+  delete MOens;
   delete tmpmat;
   //delete MOens;
 }

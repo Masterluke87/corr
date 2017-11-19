@@ -24,7 +24,7 @@ using namespace std;
 /*                      STATUS                                                   */
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
-void status(ofstream* outf){
+void print_header(){
   char str1[1024];
 
   size_t len = 1024;
@@ -32,9 +32,12 @@ void status(ofstream* outf){
   time(&curr_time);
 
   gethostname(str1, len);
-
-  *outf << "Host: " << str1 << ", Date: " << ctime(&curr_time);
-  outf->flush();
+  cout << "++++++++++++++++++++++++++++++++++++++\n";
+  cout << "+A PSI4/MPI/OPENMP/CUDA - MP2 PRORGAM+\n";
+  cout << "++++++++++++++++++++++++++++++++++++++\n";
+ 
+  cout << "Host: " << str1 << "\nDate: " << ctime(&curr_time);
+  cout.flush();
 }
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
@@ -72,10 +75,11 @@ int rem_com(char* filename, char* streamstring, int string_length){
 /* Read the system sizes form sysfile.                                           */
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
-void get_sys_size(std::string sysfile, int* nroao, int* nroa, long long int* nrofint){
+void get_sys_size(std::string sysfile,int* nroe, int* nroao, int* nroa, long long int* nrofint){
 
   ifstream inf(sysfile.c_str());
 
+  inf.read((char *) nroe,    sizeof(int));
   inf.read((char *) nroao,   sizeof(int));
   inf.read((char *) nroa,    sizeof(int));
   inf.read((char *) nrofint, sizeof(long long int));
@@ -96,10 +100,11 @@ void read_sys(std::string sysfile, double* coord, double* charges, double* mass,
 	      unsigned short* intnums){
   ifstream datf(sysfile.c_str());
 
-  int nroao, nroa;
+  int nroao, nroa, nroe;
   long long int nrofint;
 
   //SYSTEM DATA
+  datf.read((char *) &nroe,  sizeof(int));
   datf.read((char *) &nroao , sizeof(int));
   datf.read((char *) &nroa  , sizeof(int));
   datf.read((char *) &nrofint,  sizeof(long long int));
@@ -119,40 +124,6 @@ void read_sys(std::string sysfile, double* coord, double* charges, double* mass,
   datf.read((char *) sortcount, sizeof(long long int)*4);
   datf.read((char *) intval,    sizeof(double)*nrofint);
   datf.read((char *) intnums,   sizeof(unsigned short)*nrofint*4);
-
-  datf.close();
-}
-
-/*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
-/*                read_sys_1el(........)                                         */
-/*                                                                               */
-/*                                                                               */
-/* Read the system data, only 1 electron integrals                               */
-/*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
-
-void read_sys_1el(char* sysfile, double* coord, double* charges, double* mass,
-	      double* Hmat, double* Tmat, double* Smat,  double* Dx, double* Dy,
-	      double *Dz){
-  ifstream datf(sysfile);
-
-  int nroao, nroa;
-  long long int nrofint;
-
-  //SYSTEM DATA
-  datf.read((char *) &nroao , sizeof(int));
-  datf.read((char *) &nroa  , sizeof(int));
-  datf.read((char *) &nrofint,  sizeof(long long int));
-  datf.read((char *) coord  , sizeof(double)*3*nroa);
-  datf.read((char *) charges, sizeof(double)*nroa);
-  datf.read((char *) mass,    sizeof(double)*nroa);
-
-  //ONEL EL INTEGRAL DATA
-  datf.read((char * ) Hmat  , sizeof(double)*nroao*nroao);
-  datf.read((char * ) Tmat  , sizeof(double)*nroao*nroao);
-  datf.read((char * ) Smat  , sizeof(double)*nroao*nroao);
-  datf.read((char * ) Dx    , sizeof(double)*nroao*nroao);
-  datf.read((char * ) Dy    , sizeof(double)*nroao*nroao);
-  datf.read((char * ) Dz    , sizeof(double)*nroao*nroao);
 
   datf.close();
 }

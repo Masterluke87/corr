@@ -9,8 +9,9 @@
 #include "MOTRANS/ops_cis.h"
 #include <iomanip>
 
-void read_input(std::ifstream* inputfile, std::string* sysfile, int *nroe,int *llim, int *ulim, std::string* wavefile)
+void read_input(std::ifstream* inputfile, std::string* sysfile,int *llim, int *ulim, std::string* wavefile)
 {
+  int nroe;
   std::string tmpline;
   std::stringstream ss_input;
   if (inputfile->is_open())
@@ -27,9 +28,8 @@ void read_input(std::ifstream* inputfile, std::string* sysfile, int *nroe,int *l
     }
   }
   inputfile->close();
-  ss_input >> (*sysfile) >> (*nroe) >> (*llim) >> (*ulim) >> (*wavefile);
+  ss_input >> (*sysfile) >> (nroe) >> (*llim) >> (*ulim) >> (*wavefile);
   std::cout<<"Sysfile    : "<<(*sysfile)<<std::endl;
-  std::cout<<"#Electrons : "<<(*nroe)<<std::endl;
   std::cout<<"llim       : "<<(*llim)<<std::endl;
   std::cout<<"ulim       : "<<(*ulim)<<std::endl;
   std::cout<<"Wavefile   : "<<(*wavefile)<<std::endl;
@@ -86,30 +86,30 @@ int main(int argc, char const *argv[]) {
 
   double* prec_ints;
 
-  //auto mymol  = psi::molecule::
 
   std::string sysfile;
   std::string wavefile;
 
-  std::cout<<"PSI4-MPI Program \n";
-  if(argc != 3){
-    std::cerr << "Need input-file output-prefix\n";
+  print_header();
+  if(argc != 2){
+    std::cerr << "Need prefix\n";
     exit(1);
   }
-  std::ifstream inputfile (argv[1]);
-
-  read_input(&inputfile,&sysfile,&nroe,&llim,&ulim,&wavefile);
-  get_sys_size(sysfile, &nroao, &nroa,  &nrofint);
-
-  std::cout<< "System sizes read from       : " << sysfile << "\n";
+  sysfile  = std::string(argv[1])+".sys" ;
+  wavefile = std::string(argv[1])+".ahfw"; 
+  
+  get_sys_size(sysfile,&nroe, &nroao, &nroa,  &nrofint);
+  
+   
+  std::cout<< "\nSystem sizes read from       : " << sysfile << "\n";
   std::cout<< "Nr of basis functions        : " << nroao   << "\n";
+  std::cout<< "Nr of electrons              : " << nroe   << "\n";	
   std::cout<< "Nr of atoms                  : " << nroa << "\n";
   std::cout<< "Nr of non zero 2el integrals : " << nrofint << "\n";
-  std::cout<< "=======================================\n\n";
 
   //MEMORY ALLOCATION for one electron atoms, mat&vecs
   int atom_ao_mem = 5*nroa+14*nroao*nroao+3*nroao;
-  std::cout << "Need " << atom_ao_mem*sizeof(double) << " bytes for atomic + one electron data\n";
+ // std::cout << "Need " << atom_ao_mem*sizeof(double) << " bytes for atomic + one electron data\n";
 
   dumd  = (double *) malloc(atom_ao_mem*sizeof(double));
 	int inc = 0;
@@ -125,42 +125,40 @@ int main(int argc, char const *argv[]) {
 
   tmpvals = &(dumd[inc]); inc += nroao;
   //MEMORY ALLOCATION for two electron values
-  std::cout << "Need " << nrofint*(sizeof(double)+sizeof(unsigned short)*4) << " bytes for two electron data\n";
+  //std::cout << "Need " << nrofint*(sizeof(double)+sizeof(unsigned short)*4) << " bytes for two electron data\n";
 
   intval        = new double[nrofint];                     //two electron integrals
   intnums       = new unsigned short[nrofint*4];           //two electron indices
                                              //num of two electron Integrals in each perm. type
   read_sys(sysfile, coord, charges, mass, Hmat, Tmat, Smat, Dx, Dy,  Dz, sortcount, intval, intnums);
-  std::cout<<"Atomic charges: ";
+  
+  std::cout<< "Atomic charges               : ";
   for (int i=0;i<nroa;i++)
 	std::cout<<charges[i]<<" ";
 
-
   ion_rep =  calc_ion_rep( nroa, coord, charges);
 
-  std::cout << "Calculating S^-1/2\n";
+  std::cout << "\nCalculating S^-1/2\n";
   std::cout << "Minimal eigenvalue of S is " << calc_S12( nroao, Smat, Som12, tmpmat1, tmpvecs, tmpvals) <<"\n";
 
   read_wav_HF(wavefile, nroao, MOens, MOs);
   std::cout<< "HF-wave function  read from " << wavefile << "\n";
 
-  for (size_t x = 0; x < nroao*nroao; x++) {
-    Fmat[x] = Hmat[x];
-  }
+//some core guess for testing
+  for (int i =0;i<nroao*nroao;i++)
+	Fmat[i] = Hmat[i];
+  double *tmpmat = new double[nroao*nroao];
+  diag_Fmat(nroao, Fmat,MOs,MOens,Som12, tmpmat);
+  delete tmpmat;
+//--END-COREGUESS
   run_scf(nroao,nroe,MOs,Pmat,Hmat,Fmat,intnums,intval,sortcount,nrofint,Som12,100,ion_rep);
+    
 
-
-
-
-
-    //
-    //  TRAFO
-    //
-    std::cout << "Precalculating <oo|oo> up to <ov|vv>\n";
-    std::cout << nroe << '\n';
-    std::cout << nroe/2 << '\n';
-    std::cout << nroao << '\n';
-    long long int prec_mem = (long long int) nroe/2*(long long int) nroao* (long long int) nroao* (long long int) nroao;
+  std::cout << "Precalculating <oo|oo> up to <ov|vv>\n";
+  std::cout << nroe << '\n';
+  std::cout << nroe/2 << '\n';
+  std::cout << nroao << '\n';
+  long long int prec_mem = (long long int) nroe/2*(long long int) nroao* (long long int) nroao* (long long int) nroao;
     std::cout << "Need " << prec_mem*sizeof(double) << " bytes (" << prec_mem*sizeof(double)/1024/1024 << " MB) for precalculation\n";
     std::cout << prec_mem << " doubles on "<< worldsize<< " cpus \n";
     if (worldsize > 1){
@@ -238,7 +236,7 @@ int main(int argc, char const *argv[]) {
       }
     }
 
-/*
+//
     std::cout << "\nCalculating semi-canonical amplitudes ... ";
     int nocc = nroe/2;
     int nvir = nroao - nocc;
@@ -316,7 +314,7 @@ int main(int argc, char const *argv[]) {
     }
     std::cout <<std::fixed<<std::setw( 10 )<<std::setprecision(10)<<"E(sem-loc):" <<std::setw( 16 ) <<E<<'\t' << "Rsum:" << Rsum <<'\n';
   }
-*/
+
     //Hartree-Fock
     for (size_t i = 0; i < nroe/2; i++) {
       oneE += 2 * HMo[i*nroao + i];
@@ -334,7 +332,7 @@ int main(int argc, char const *argv[]) {
     std::cout << std::setw( 10 ) << "twoE:" <<std::setw( 16 )<<twoE<< '\n';
     std::cout << std::setw( 10 ) << "HF  :" <<std::setw( 16 )<<oneE+twoE<<'\n';
     ///END Hartree-Fock
-/*
+
     //calculate canonical MP2:
     double EMP2 = 0.0;
     double EMP2_SS = 0.0;
@@ -363,7 +361,7 @@ int main(int argc, char const *argv[]) {
     std::cout <<std::setw( 10 ) << "EMP2_SS:" <<std::setw( 16 )<<EMP2_SS<< '\n';
     std::cout <<std::setw( 10 ) << "EMP2_OS:" <<std::setw( 16 )<<EMP2_OS<< '\n';
     std::cout <<std::setw( 10 ) << "EMP2:"    <<std::setw( 16 )<<EMP2<< '\n';
-*/
+
 
 
 

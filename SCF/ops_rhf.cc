@@ -354,7 +354,7 @@ double Calc_e_el(int nroao, double* Fmat, double* Pmat, double* Hmat){
       E_tot_el += Pmat[x*nroao+y]*(Fmat[y*nroao+x] + Hmat[y*nroao+x]);
     }
   }
-  return(E_tot_el/2.);
+  return(E_tot_el/2);
 }
 /*******************************************************************************
  * calculation of one electrion expc. values                                   *
