@@ -131,6 +131,11 @@ int main(int argc, char const *argv[]) {
   intnums       = new unsigned short[nrofint*4];           //two electron indices
                                              //num of two electron Integrals in each perm. type
   read_sys(sysfile, coord, charges, mass, Hmat, Tmat, Smat, Dx, Dy,  Dz, sortcount, intval, intnums);
+  std::cout<<"Atomic charges: ";
+  for (int i=0;i<nroa;i++)
+	std::cout<<charges[i]<<" ";
+
+
   ion_rep =  calc_ion_rep( nroa, coord, charges);
 
   std::cout << "Calculating S^-1/2\n";

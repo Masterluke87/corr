@@ -2,35 +2,34 @@
 # PYTHONPATH must include directory above plugin directory.
 #     Define either externally or here, then import plugin.
 sys.path.insert(0, './..')
-#import syshfwplug
+import syshfwplug
 
 
-#plugin_load("./syshfwplug.so")
+plugin_load("./syshfwplug.so")
 
 
 molecule {
-O       5.000000000000000      5.000000000000000      5.117780000000000
-H       5.000000000000000      5.764450000000000      4.528860000000000
-H       5.000000000000000      4.235550000000000      4.528860000000000
+Au 0.0 0.0 0.0 
+Au 2.5 0.0 0.0
 symmetry c1
 }
 
 set {
-  basis def2-qzvp
+  basis def2-svp
 }
 
-#set syshfwplug {
-#  pref mytest
-#  do_tei 1
-#  print 1
-#}
+set syshfwplug {
+  pref mytest
+  do_tei 1
+  print 1
+}
 
-set scf reference uhf
+set scf reference rhf
 set scf_type pk
 set scf PRINT_MOS  true
 
 
 e_scf,ref_wfn = energy('scf',return_wfn=True)
 
-#plugin("syshfwplug.so", ref_wfn)
+plugin("syshfwplug.so", ref_wfn)
 #syshfwplug.exampleFN(ref_wfn)

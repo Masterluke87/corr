@@ -131,10 +131,8 @@ SharedWavefunction syshfwplug(SharedWavefunction ref_wfn, Options &options)
     
     
     // Form h = T + V by first cloning T and then adding V
-    hMat->copy(tMat);
-    hMat->add(vMat);
-    hMat->print();
     hMat = ref_wfn->H();
+    
     //Coeff.
     std::shared_ptr<Matrix>     Calpha = ref_wfn->Ca();   //last index over MOS!!!!!!	
     std::shared_ptr<Matrix>     Cbeta  = ref_wfn->Cb();                                     
@@ -214,7 +212,7 @@ SharedWavefunction syshfwplug(SharedWavefunction ref_wfn, Options &options)
     intval = new double[nrofint];
     intnums = new unsigned short[nrofint*4+4]; 
     for (int j=0;j<molecule->natom();j++){
-      charges[j] = molecule->charge(j);
+      charges[j] = molecule->Z(j);
       mass[j]    = molecule->mass(j);
       for (int i=0;i<3;i++){
 	Coord[3*j+i] = coord->get(j,i);
