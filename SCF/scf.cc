@@ -16,6 +16,23 @@ extern "C"
    int daxpy_(int* ,double*,double*,int*,double*, int*);
  }
 
+void form_core_guess(int nroao,double* Fmat, double* Hmat,double * Som12,double* MOs,double* MOens)
+{
+  for (int i =0;i<nroao*nroao;i++)
+  	     Fmat[i] = Hmat[i];
+  double *tmpmat = new double[nroao*nroao];
+
+  diag_Fmat(nroao, Fmat,MOs,MOens,Som12, tmpmat);
+  delete[] tmpmat;
+}
+
+
+
+
+
+
+
+
 void build_Pmat(double *C,int nroao, int nroe, double *Pmat,double damp)
 {
   double alpha=2.0 * (1-damp);
@@ -83,24 +100,26 @@ void run_scf(int nroao,int nroe, double* C, double* Pmat,double* Hmat,double* Fm
   double start = 0.0;
   double end   = 0.0;
   int iter=0;
+  build_Pmat(C,nroao,nroe,Pmat,0.0);
   std::cout<<std::fixed<<std::setprecision(10);
   std::cout<<std::setw(-4)<<"Iter"<<std::setw( 16 )<<"ESCF" << std::setw( 16 )<<"DE"<<std::setw( 16 )<<"t[s]"<<"\n";
   while (iter  < maxiter && std::fabs(DE)>1E-8) {
     start = omp_get_wtime();
     //with guess
     build_Pmat(C,nroao,nroe,Pmat,damp);
-    diag_Fmat(nroao, Fmat,C,MOens,Som12, tmpmat);
     build_Fmat(nroao,Fmat,Pmat,Hmat,intvals,intnums,sortcount,nrofint);
-
-    // build_Pmat(C,nroao,nroe,Pmat,damp);
-    // build_Fmat(nroao,Fmat,Pmat,Hmat,intvals,intnums,sortcount,nrofint);
-    // diag_Fmat(nroao, Fmat,C,MOens,Som12, tmpmat);
     Escf = Calc_e_el(nroao,Fmat,Pmat,Hmat);
     DE = Escf - Eold;
     Eold = Escf;
     end = omp_get_wtime();
     std::cout<<std::setw(4)<<iter<<":"<<
     std::setw( 16 )<< Escf+ion_rep<<std::setw( 16 )<<DE <<std::setw( 16 )<<(end-start)<<'\n';
+    diag_Fmat(nroao, Fmat,C,MOens,Som12, tmpmat);
+
+
+    // build_Pmat(C,nroao,nroe,Pmat,damp);
+    // build_Fmat(nroao,Fmat,Pmat,Hmat,intvals,intnums,sortcount,nrofint);
+    // diag_Fmat(nroao, Fmat,C,MOens,Som12, tmpmat);
     iter++;
 }
 

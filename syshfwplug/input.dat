@@ -30,9 +30,8 @@ set scf_type pk
 set scf PRINT_MOS  true
 
 
-e_scf,ref_wfn = energy('scf',return_wfn=True)
+e_scf,ref_wfn = energy('mp2',return_wfn=True)
 
-ref_wfn.Da().print_out()
 
 plugin("syshfwplug.so", ref_wfn)
 #syshfwplug.exampleFN(ref_wfn)

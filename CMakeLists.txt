@@ -13,6 +13,8 @@ endif()
 
 add_executable(mp2 main.cc
       		    POSTHF/motrans.cc
+              POSTHF/loc_mp2.cc
+              POSTHF/can_mp2.cc
 		          IO/ops_io.cc
 		          MATH/ops_mat.cc
 		          SCF/ops_rhf.cc

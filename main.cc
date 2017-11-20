@@ -7,6 +7,8 @@
 #include "SCF/ops_rhf.h"
 #include "SCF/scf.h"
 #include "POSTHF/motrans.h"
+#include "POSTHF/loc_mp2.h"
+#include "POSTHF/can_mp2.h"
 #include <iomanip>
 
 int main(int argc, char const *argv[]) {
@@ -110,14 +112,14 @@ int main(int argc, char const *argv[]) {
   std::cout<< "HF-wave function  read from " << wavefile << "\n";
 
 //some core guess for testing
-  for (int i =0;i<nroao*nroao;i++)
-	     Fmat[i] = Hmat[i];
-  double *tmpmat = new double[nroao*nroao];
-  diag_Fmat(nroao, Fmat,MOs,MOens,Som12, tmpmat);
-  delete[] tmpmat;
-//--END-COREGUESS
+ // for (int i =0;i<nroao*nroao;i++)
+ //	     Fmat[i] = Hmat[i];
+//   double *tmpmat = new double[nroao*nroao];
+   //diag_Fmat(nroao, Fmat,MOs,MOens,Som12, tmpmat);
+  // delete[] tmpmat;
+//  --END-COREGUESS
+  //form_core_guess(nroao,Fmat,Hmat,Som12,MOs,MOens);
   run_scf(nroao,nroe,MOs,Pmat,Hmat,Fmat,intnums,intval,sortcount,nrofint,Som12,100,ion_rep);
-
 
   std::cout << "Precalculating <oo|oo> up to <ov|vv>\n";
   std::cout << nroe << '\n';
@@ -201,91 +203,13 @@ int main(int argc, char const *argv[]) {
       }
     }
 
-//
-    std::cout << "\nCalculating semi-canonical amplitudes ... ";
-    int nocc = nroe/2;
-    int nvir = nroao - nocc;
-    double* T_ijab   = new double[nocc*nocc*nvir*nvir];
-    int Ti,Tj,Ta,Tb = 0;
-    int Ta_step = nvir;
-    int Tj_step = Ta_step * nvir;
-    int Ti_step = Tj_step * nocc;
+//    run_non_canonical_mp2(nroao,nroe,prec_ints,FMo);
 
-    for (Ti = 0; Ti < nocc; Ti++) {
-      for (Tj = 0; Tj < nocc; Tj++) {
-        for (Ta = 0; Ta < nvir; Ta++) {
-          for (Tb = 0; Tb < nvir; Tb++) {
-            T_ijab[Ti*Ti_step + Tj*Tj_step + Ta*Ta_step + Tb] = - prec_ints[Ti * istep + (Ta+nocc)*jstep  + Tj*kstep + (Tb+nocc)] /
-                                                                  (FMo[(nocc+Ta)*nroao + (nocc+Ta)] + FMo[(nocc+Tb)*nroao + (nocc+Tb)] - FMo[Ti*nroao + Ti] - FMo[Tj*nroao + Tj]);
-
-          }
-        }
-      }
-    }
-    std::cout << "done" << '\n';
-    double* G_ijab   = new double[nocc*nocc*nvir*nvir];
-    double* R_ijab   = new double[nocc*nocc*nvir*nvir];
-
-    for (size_t iter = 0; iter < 20; iter++) {
-      for (Ti = 0; Ti < nocc; Ti++) {
-        for (Tj = 0; Tj < nocc; Tj++) {
-          for (Ta = 0; Ta < nvir; Ta++) {
-            for (Tb = 0; Tb < nvir; Tb++) {
-              G_ijab[Ti*Ti_step + Tj*Tj_step + Ta*Ta_step + Tb] = 0.0;
-              for (int k = 0; k < nocc; k++) {
-                if (k!=Ti){
-                  G_ijab[Ti*Ti_step + Tj*Tj_step + Ta*Ta_step + Tb] +=  -FMo[Ti*nroao + k] * T_ijab[k*Ti_step + Tj*Tj_step + Ta*Ta_step + Tb];
-                }
-              }
-            }
-          }
-        }
-      }
-
-
-      double Rsum = 0.0;
-      for (Ti = 0; Ti < nocc; Ti++) {
-        for (Tj = 0; Tj < nocc; Tj++) {
-          for (Ta = 0; Ta < nvir; Ta++) {
-            for (Tb = 0; Tb < nvir; Tb++) {
-              R_ijab[Ti*Ti_step + Tj*Tj_step + Ta*Ta_step + Tb] = prec_ints[Ti * istep + (Ta+nocc)*jstep  + Tj*kstep + (Tb+nocc)] +
-                                                                (FMo[(nocc+Ta)*nroao + (nocc+Ta)] + FMo[(nocc+Tb)*nroao + (nocc+Tb)] - FMo[Ti*nroao + Ti] - FMo[Tj*nroao + Tj])*T_ijab[Ti*Ti_step + Tj*Tj_step + Ta*Ta_step + Tb]+
-                                                                G_ijab[Ti*Ti_step + Tj*Tj_step + Ta*Ta_step + Tb] +
-                                                                G_ijab[Tj*Ti_step + Ti*Tj_step + Tb*Ta_step + Ta];
-              Rsum += fabs(R_ijab[Ti*Ti_step + Tj*Tj_step + Ta*Ta_step + Tb]);
-          }
-        }
-      }
-    }
-    double E = 0.0;
-    for (Ti = 0; Ti < nocc; Ti++) {
-      for (Tj = 0; Tj < nocc; Tj++) {
-        for (Ta = 0; Ta < nvir; Ta++) {
-          for (Tb = 0; Tb < nvir; Tb++) {
-            E +=  (prec_ints[Ti * istep + (Ta+nocc)*jstep  + Tj*kstep + (Tb+nocc)] + R_ijab[Ti*Ti_step + Tj*Tj_step + Ta*Ta_step + Tb])* (2 * T_ijab[Ti*Ti_step + Tj*Tj_step + Ta*Ta_step + Tb] -T_ijab[Ti*Ti_step + Tj*Tj_step + Tb*Ta_step + Ta]);
-          }
-        }
-      }
-    }
-
-    for (Ti = 0; Ti < nocc; Ti++) {
-      for (Tj = 0; Tj < nocc; Tj++) {
-        for (Ta = 0; Ta < nvir; Ta++) {
-          for (Tb = 0; Tb < nvir; Tb++) {
-              T_ijab[Ti*Ti_step + Tj*Tj_step + Ta*Ta_step + Tb] += - R_ijab[Ti*Ti_step + Tj*Tj_step + Ta*Ta_step + Tb]/(FMo[(nocc+Ta)*nroao + (nocc+Ta)] + FMo[(nocc+Tb)*nroao + (nocc+Tb)] - FMo[Ti*nroao + Ti] - FMo[Tj*nroao + Tj]);
-          }
-        }
-      }
-    }
-    std::cout <<std::fixed<<std::setw( 10 )<<std::setprecision(10)<<"E(sem-loc):" <<std::setw( 16 ) <<E<<'\t' << "Rsum:" << Rsum <<'\n';
-  }
-
-    //Hartree-Fock
     for (size_t i = 0; i < nroe/2; i++) {
       oneE += 2 * HMo[i*nroao + i];
     }
     oneE += ion_rep;
-    std::cout<<std::setw( 10 )<< "oneE:" <<std::setw( 16 )<<oneE<<'\n';
+    std::cout<<'\n'<<std::setw( 10 )<< "oneE:" <<std::setw( 16 )<<oneE<<'\n';
 
     for (size_t i = 0; i < nroe/2; i++) {
       for (size_t j = 0; j < nroe/2; j++) {
@@ -298,42 +222,7 @@ int main(int argc, char const *argv[]) {
     std::cout << std::setw( 10 ) << "HF  :" <<std::setw( 16 )<<oneE+twoE<<'\n';
     ///END Hartree-Fock
 
-    //calculate canonical MP2:
-    double EMP2 = 0.0;
-    double EMP2_SS = 0.0;
-    double EMP2_OS = 0.0;
-    double* eps = new double[nroao];
-    for (int i = 0; i < nroao; i++) {
-      eps[i] = HMo[i*nroao + i];
-
-      for (size_t j = 0; j < nroe/2; j++) {
-        eps[i]+=(2 *prec_ints[j*istep + j*jstep + i*kstep + i]
-                 - prec_ints[j*istep + i*jstep + j*kstep + i]);
-      }
-    }
-
-    for (int i = 0; i < nroe/2; i++) {
-      for (int j = 0; j < nroe/2; j++) {
-        for (int a = nroe/2; a < nroao; a++) {
-          for (int b = nroe/2;  b < nroao; b++) {
-            EMP2_SS += - (prec_ints[i*istep + a*jstep + j*kstep + b]*(prec_ints[i*istep + a*jstep + j*kstep + b]))/ (eps[a]+eps[b]-eps[i]-eps[j]);
-            EMP2_OS += - (prec_ints[i*istep + a*jstep + j*kstep + b] - prec_ints[i*istep + b*jstep + j*kstep + a])*prec_ints[i*istep + a*jstep + j*kstep + b]/(eps[a]+eps[b]-eps[i]-eps[j]);
-          }
-        }
-      }
-    }
-    EMP2 = EMP2_OS + EMP2_SS;
-    std::cout <<std::setw( 10 ) << "EMP2_SS:" <<std::setw( 16 )<<EMP2_SS<< '\n';
-    std::cout <<std::setw( 10 ) << "EMP2_OS:" <<std::setw( 16 )<<EMP2_OS<< '\n';
-    std::cout <<std::setw( 10 ) << "EMP2:"    <<std::setw( 16 )<<EMP2<< '\n';
-
-
-
-
-
-
-
-
+  run_canonical_mp2(nroe,nroao,prec_ints,FMo);
 
   std::cout << "\n\n--END--" << '\n';
   return 0;
