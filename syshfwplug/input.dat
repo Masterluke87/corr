@@ -9,13 +9,14 @@ plugin_load("./syshfwplug.so")
 
 
 molecule {
-Au 0.0 0.0 0.0 
-Au 2.5 0.0 0.0
+O  0.0 0.0 0.0 
+H  1.0 1.0 0.0
+H -1.0 1.0 0.0
 symmetry c1
 }
 
 set {
-  basis def2-svp
+  basis def2-qzvpp
 }
 
 set syshfwplug {

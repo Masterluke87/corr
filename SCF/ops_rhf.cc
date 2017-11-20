@@ -2,6 +2,7 @@
 #include <iostream>
 #include <stdlib.h>
 #include "ops_rhf.h"
+#include <omp.h>
 
 using namespace std;
 
@@ -225,7 +226,7 @@ double build_Pmat_dscf(int nroao, int nroe, double* Pmat, double* Pmat_old,
  ******************************************************************************/
 
 
-inline void perm_all(unsigned short a, unsigned short b,
+void perm_all(unsigned short a, unsigned short b,
 		     unsigned short c, unsigned short d, double integral,
                      double* Fmat, double* Pmat, int nroao){
   //J-Terme
@@ -249,7 +250,7 @@ inline void perm_all(unsigned short a, unsigned short b,
   Fmat[d*nroao+b] -= 0.5*Pmat[c*nroao+a]*integral; //8
 }
 
-inline void perm_1234(unsigned short a, unsigned short b,
+void perm_1234(unsigned short a, unsigned short b,
 		      unsigned short c, unsigned short d, double integral,
                       double* Fmat, double* Pmat, int nroao){
   //J-Terme
@@ -266,7 +267,7 @@ inline void perm_1234(unsigned short a, unsigned short b,
 }
 
 
-inline void perm_1256(unsigned short a, unsigned short b,
+void perm_1256(unsigned short a, unsigned short b,
 		      unsigned short c, unsigned short d, double integral,
                       double* Fmat, double* Pmat, int nroao){
   //J-Terme
@@ -282,7 +283,7 @@ inline void perm_1256(unsigned short a, unsigned short b,
   Fmat[d*nroao+a] -= 0.5*Pmat[c*nroao+b]*integral; //6
 }
 
-inline void perm_15(unsigned short a, unsigned short b,
+void perm_15(unsigned short a, unsigned short b,
 		    unsigned short c, unsigned short d, double integral,
                     double* Fmat, double* Pmat, int nroao){
   //J-Terme
@@ -294,12 +295,11 @@ inline void perm_15(unsigned short a, unsigned short b,
   Fmat[c*nroao+a] -= 0.5*Pmat[d*nroao+b]*integral; //5
 }
 
-inline void perm_1(unsigned short a, unsigned short b,
+void perm_1(unsigned short a, unsigned short b,
 		   unsigned short c, unsigned short d, double integral,
                    double* Fmat, double* Pmat, int nroao){
   //J-Terme
   Fmat[a*nroao+b] += Pmat[c*nroao+d]*integral; //1
-
   //K-Terme
   Fmat[a*nroao+c] -= 0.5*Pmat[b*nroao+d]*integral; //1
 }
@@ -315,28 +315,33 @@ void build_Fmat(int nroao, double* Fmat, double* Pmat, double* Hmat,double* intv
     }
   }
 
+	//cannot get to work a "global reduction" -> after ever
 
-  //PERM_1
+  //PERM 1
+	#pragma omp parallel for reduction(+:Fmat[:nroao*nroao])
   for(long long int x = 0; x < sortcount[0]; x++)
     perm_1(intnums[x*4+0],intnums[x*4+1],intnums[x*4+2],intnums[x*4+3],intval[x],Fmat,Pmat,nroao);
 
-
   //PERM_15
-  for(long long int x = sortcount[0]; x < sortcount[1]; x++)
+	#pragma omp parallel for reduction(+:Fmat[:nroao*nroao])
+  for(long long int x = sortcount[0]; x < sortcount[1]; x++){
     perm_15(intnums[x*4+0],intnums[x*4+1],intnums[x*4+2],intnums[x*4+3],intval[x],Fmat,Pmat,nroao);
-
+	}
 
   //PERM_1234
+	#pragma omp parallel for reduction(+:Fmat[:nroao*nroao])
   for(long long int x = sortcount[1]; x < sortcount[2]; x++)
     perm_1234(intnums[x*4+0],intnums[x*4+1],intnums[x*4+2],intnums[x*4+3],intval[x],Fmat,Pmat,nroao);
 
 
   //PERM_1256
+	#pragma omp parallel for reduction(+:Fmat[:nroao*nroao])
   for(long long int x = sortcount[2]; x < sortcount[3]; x++)
     perm_1256(intnums[x*4+0],intnums[x*4+1],intnums[x*4+2],intnums[x*4+3],intval[x],Fmat,Pmat,nroao);
 
 
   //PERM_ALL
+	#pragma omp parallel for reduction(+:Fmat[:nroao*nroao])
   for(long long int x = sortcount[3]; x < nrofint; x++)
     perm_all(intnums[x*4+0],intnums[x*4+1],intnums[x*4+2],intnums[x*4+3],intval[x],Fmat,Pmat,nroao);
 }

@@ -12,7 +12,7 @@ set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}
 endif()
 
 add_executable(mp2 main.cc
-      		    MOTRANS/ops_cis.cc
+      		    POSTHF/motrans.cc
 		          IO/ops_io.cc
 		          MATH/ops_mat.cc
 		          SCF/ops_rhf.cc

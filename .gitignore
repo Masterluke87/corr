@@ -4,12 +4,13 @@ mp2
 MYTEST.*
 cmake_install.cmake
 *.gch
+*.o
 build/
 syshfwplug/CMakeFiles/
 syshfwplug/__init__.pyc
 syshfwplug/pymodule.pyc
 syshfwplug/pymodule.py~
 syshfwplug/CMakeCache.txt
-syshfwplug/psi.8578.clean
+syshfwplug/psi.*
 syshfwplug/timer.dat
 

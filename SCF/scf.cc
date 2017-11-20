@@ -72,7 +72,7 @@ void run_scf(int nroao,int nroe, double* C, double* Pmat,double* Hmat,double* Fm
             unsigned short* intnums, double* intvals, long long int* sortcount,
             long long int nrofint, double* Som12, int maxiter,double ion_rep){
   std::cout << "+++++++++++SCF++++++++++" << '\n';
-  
+
 
   double* tmpmat = new double[nroao*nroao];
   double* MOens  = new double [nroao];
@@ -104,7 +104,7 @@ void run_scf(int nroao,int nroe, double* C, double* Pmat,double* Hmat,double* Fm
     iter++;
 }
 
-  delete MOens;
-  delete tmpmat;
+  delete[] MOens;
+  delete[] tmpmat;
   //delete MOens;
 }

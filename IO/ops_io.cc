@@ -35,7 +35,7 @@ void print_header(){
   cout << "++++++++++++++++++++++++++++++++++++++\n";
   cout << "+A PSI4/MPI/OPENMP/CUDA - MP2 PRORGAM+\n";
   cout << "++++++++++++++++++++++++++++++++++++++\n";
- 
+
   cout << "Host: " << str1 << "\nDate: " << ctime(&curr_time);
   cout.flush();
 }
@@ -66,6 +66,35 @@ int rem_com(char* filename, char* streamstring, int string_length){
     cerr << "Buffer size exceeded !\n"; exit(0);
   }
   return(strlen(streamstring));
+}
+
+/*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+/*              read_inpuy (char* sysfile, int* nroao, int* nroa,             */
+/*                              long long int* nrofint)                          */
+/*                                                                               */
+/* Read the system sizes form sysfile.                                           */
+/*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
+void read_input(std::ifstream* inputfile)
+{
+  int nroe;
+  std::string tmpline;
+  std::stringstream ss_input;
+  if (inputfile->is_open())
+  {
+    while(std::getline((*inputfile),tmpline))
+    {
+      //remove comments
+      if (tmpline.find_first_of("#")!=std::string::npos)
+        tmpline.erase(tmpline.find_first_of("#"),tmpline.length());
+      if (tmpline.find_first_of(" ")!=std::string::npos)
+        tmpline.erase(tmpline.find_first_of(" "),tmpline.length());
+      if (tmpline.compare("\n")!=0)
+        ss_input <<tmpline<<" ";
+    }
+  }
+  inputfile->close();
+  //parse input variables here
+  //ss_input >> (*sysfile) >> (nroe) >> (*llim) >> (*ulim) >> (*wavefile);
 }
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/

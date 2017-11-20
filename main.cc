@@ -6,36 +6,8 @@
 #include "IO/ops_io.h"
 #include "SCF/ops_rhf.h"
 #include "SCF/scf.h"
-#include "MOTRANS/ops_cis.h"
+#include "POSTHF/motrans.h"
 #include <iomanip>
-
-void read_input(std::ifstream* inputfile, std::string* sysfile,int *llim, int *ulim, std::string* wavefile)
-{
-  int nroe;
-  std::string tmpline;
-  std::stringstream ss_input;
-  if (inputfile->is_open())
-  {
-    while(std::getline((*inputfile),tmpline))
-    {
-      //remove comments
-      if (tmpline.find_first_of("#")!=std::string::npos)
-        tmpline.erase(tmpline.find_first_of("#"),tmpline.length());
-      if (tmpline.find_first_of(" ")!=std::string::npos)
-        tmpline.erase(tmpline.find_first_of(" "),tmpline.length());
-      if (tmpline.compare("\n")!=0)
-        ss_input <<tmpline<<" ";
-    }
-  }
-  inputfile->close();
-  ss_input >> (*sysfile) >> (nroe) >> (*llim) >> (*ulim) >> (*wavefile);
-  std::cout<<"Sysfile    : "<<(*sysfile)<<std::endl;
-  std::cout<<"llim       : "<<(*llim)<<std::endl;
-  std::cout<<"ulim       : "<<(*ulim)<<std::endl;
-  std::cout<<"Wavefile   : "<<(*wavefile)<<std::endl;
-  std::cout<<"=======================================\n\n";
-}
-
 
 int main(int argc, char const *argv[]) {
   int worldsize = 1;
@@ -96,21 +68,17 @@ int main(int argc, char const *argv[]) {
     exit(1);
   }
   sysfile  = std::string(argv[1])+".sys" ;
-  wavefile = std::string(argv[1])+".ahfw"; 
-  
+  wavefile = std::string(argv[1])+".ahfw";
   get_sys_size(sysfile,&nroe, &nroao, &nroa,  &nrofint);
-  
-   
+
   std::cout<< "\nSystem sizes read from       : " << sysfile << "\n";
   std::cout<< "Nr of basis functions        : " << nroao   << "\n";
-  std::cout<< "Nr of electrons              : " << nroe   << "\n";	
+  std::cout<< "Nr of electrons              : " << nroe   << "\n";
   std::cout<< "Nr of atoms                  : " << nroa << "\n";
   std::cout<< "Nr of non zero 2el integrals : " << nrofint << "\n";
 
   //MEMORY ALLOCATION for one electron atoms, mat&vecs
   int atom_ao_mem = 5*nroa+14*nroao*nroao+3*nroao;
- // std::cout << "Need " << atom_ao_mem*sizeof(double) << " bytes for atomic + one electron data\n";
-
   dumd  = (double *) malloc(atom_ao_mem*sizeof(double));
 	int inc = 0;
 
@@ -124,20 +92,17 @@ int main(int argc, char const *argv[]) {
   tmpmat1 = &(dumd[inc]); inc += nroao*nroao; tmpmat2 = &(dumd[inc]); inc += nroao*nroao; tmpvecs = &(dumd[inc]); inc += nroao*nroao;
 
   tmpvals = &(dumd[inc]); inc += nroao;
-  //MEMORY ALLOCATION for two electron values
-  //std::cout << "Need " << nrofint*(sizeof(double)+sizeof(unsigned short)*4) << " bytes for two electron data\n";
 
   intval        = new double[nrofint];                     //two electron integrals
   intnums       = new unsigned short[nrofint*4];           //two electron indices
                                              //num of two electron Integrals in each perm. type
   read_sys(sysfile, coord, charges, mass, Hmat, Tmat, Smat, Dx, Dy,  Dz, sortcount, intval, intnums);
-  
+
   std::cout<< "Atomic charges               : ";
   for (int i=0;i<nroa;i++)
-	std::cout<<charges[i]<<" ";
+	 std::cout<<charges[i]<<" ";
 
   ion_rep =  calc_ion_rep( nroa, coord, charges);
-
   std::cout << "\nCalculating S^-1/2\n";
   std::cout << "Minimal eigenvalue of S is " << calc_S12( nroao, Smat, Som12, tmpmat1, tmpvecs, tmpvals) <<"\n";
 
@@ -146,13 +111,13 @@ int main(int argc, char const *argv[]) {
 
 //some core guess for testing
   for (int i =0;i<nroao*nroao;i++)
-	Fmat[i] = Hmat[i];
+	     Fmat[i] = Hmat[i];
   double *tmpmat = new double[nroao*nroao];
   diag_Fmat(nroao, Fmat,MOs,MOens,Som12, tmpmat);
-  delete tmpmat;
+  delete[] tmpmat;
 //--END-COREGUESS
   run_scf(nroao,nroe,MOs,Pmat,Hmat,Fmat,intnums,intval,sortcount,nrofint,Som12,100,ion_rep);
-    
+
 
   std::cout << "Precalculating <oo|oo> up to <ov|vv>\n";
   std::cout << nroe << '\n';
