@@ -6,6 +6,9 @@
 #include <omp.h>
 #include "ops_rhf.h"
 
+#define PWIDTH_L 12
+#define PWIDTH_R 16
+
 extern "C"
  {
    int dgemm_(char *, char *,

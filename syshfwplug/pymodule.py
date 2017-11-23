@@ -171,7 +171,8 @@ def write_wavefunction_file(filename,eps,Mos):
   
 
 
-def exampleFN(W):    
+def exampleFN(W):
+    """
     resB,LB = localize_boys(W)
     C= np.asarray(W.Ca_subset("AO","OCC"))
     #print calculate_boys(W,C)
@@ -200,8 +201,24 @@ def exampleFN(W):
     molden.write(str(u'loc.molden'),psi4.core.Matrix.from_array(C),psi4.core.Matrix.from_array(C),W.epsilon_a(),W.epsilon_a(),W.epsilon_a(),W.epsilon_a(),True)
 
     print W.basisset().nbf()    
+  
+    base_wfn = psi4.core.Wavefunction.build(mol , psi4.core.get_global_option('BASIS'))
+    basis   = psi4.core.BasisSet.build(mol)
+    ribasis = psi4.core.BasisSet.build(mol, 'DF_BASIS_MP2', '', 'RIFIT', psi4.core.get_global_option('BASIS'))
+
     
+    mints = psi4.core.MintsHelper(base_wfn.basisset())
+
+    T = np.asarray(mints.ao_kinetic())
+    V = np.asarray(mints.ao_potential())
+    ECP = np.asarray(mints.ao_ecp())
     
+    H = T+V+ECP
+    """
+    aux = psi4.core.BasisSet.build(mol, "DF_BASIS_MP2", "", "RIFIT", "aug-cc-pvdz")
+
+
+    return 0
 
 
 

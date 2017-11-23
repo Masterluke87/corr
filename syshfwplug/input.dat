@@ -3,15 +3,61 @@
 #     Define either externally or here, then import plugin.
 sys.path.insert(0, './..')
 import syshfwplug
+import psi4
 
 
 plugin_load("./syshfwplug.so")
 
 
-molecule {
-O  0.0 0.0 0.0 
-H  1.0 1.0 0.0
-H -1.0 1.0 0.0
+molecule mymol {
+ Au                 0.35968923    0.69472540   -1.19378225
+ Au                 5.51222143   -1.90804454   -1.57606317
+ Au                -5.94155331    0.04722392   -2.67723809
+ Au                -3.38269019    0.83301197   -3.77395737
+ Au                -4.27370575   -0.49525376    2.82157939
+ Au                -0.05215542    4.23420054    0.75236186
+ Au                -2.28618122    1.26128971    3.68598618
+ Au                 0.89633104   -2.85948993   -3.29690399
+ Au                 0.77951688   -4.74650711   -1.25193406
+ Au                -5.09672866   -0.42975342    0.00068435
+ Au                 1.52242117   -0.13731982   -3.67674785
+ Au                -1.28365882    1.44458524    0.91170583
+ Au                 4.35173411   -2.29657525    0.96323678
+ Au                 0.25196217   -0.04611219    4.13448029
+ Au                 5.03890043    2.32638587    1.90975250
+ Au                -5.71980306   -2.59175898    1.72294227
+ Au                 4.96380504   -0.34818219    2.81679057
+ Au                -4.12645040    1.88261918    1.39831129
+ Au                 0.40888795   -0.80880730    1.17875746
+ Au                -0.22215072   -2.72548996    3.16079477
+ Au                 2.06373581    2.44992810   -2.62599910
+ Au                 3.50090513   -4.01637355   -1.15942660
+ Au                 0.25263294    2.61019622    3.20060623
+ Au                 2.44541214   -1.55223736    3.07913940
+ Au                -0.63378233    1.76558719   -3.63299397
+ Au                -3.76962357   -1.64432597   -2.51488311
+ Au                 1.71299163   -3.43721906    1.09563360
+ Au                 3.57308273   -2.13804405   -3.59947935
+ Au                 4.30248495    2.77779776   -0.79829838
+ Au                -2.84435119    3.48513633   -3.10729979
+ Au                -0.30743338    4.07863868   -2.04166675
+ Au                 4.08398691    0.43294657   -2.34967294
+ Au                 2.23518460    4.63446887   -0.88084168
+ Au                -4.59816502    2.06428797   -1.36097006
+ Au                 5.68062913    0.29650561    0.07975361
+ Au                -2.65228823    3.74709898   -0.32748522
+ Au                -2.23670619    3.75344941    2.45412861
+ Au                -1.93198609   -0.85961556   -0.43805153
+ Au                -1.07043183   -3.83162839    0.72793250
+ Au                 2.49809807    3.46085858    1.65659225
+ Au                 2.73305958    1.27181237    3.45024636
+ Au                -1.22202009   -0.99268347   -3.62730227
+ Au                -1.57785764   -3.33433770   -1.99709213
+ Au                 2.76850561    0.71447098    0.57340846
+ Au                -2.21211101   -1.35817012    4.63483945
+ Au                -3.70276501   -3.08176505   -0.11068238
+ Au                -3.05684210   -3.14181893    2.65796081
+ Au                 2.26526254   -1.48571181   -1.04885281
 symmetry c1
 }
 
@@ -21,17 +67,36 @@ set {
 
 set syshfwplug {
   pref mytest
-  do_tei 1
+  dryrun true
+  do_tei 0
   print 1
 }
 
-set scf reference uhf
+set scf reference rhf
 set scf_type pk
 set scf PRINT_MOS  true
 
+#e_scf,ref_wfn = energy('mp2',return_wfn=True)
+ref_wfn = psi4.core.Wavefunction.build(mymol , psi4.core.get_global_option('BASIS'))
+aux     = psi4.core.BasisSet.build(mymol, "DF_BASIS_SCF", "", "RIFIT", psi4.core.get_global_option('BASIS'))
+aux2    = psi4.core.BasisSet.build(mymol, "DF_BASIS_MP2", "", "JKFIT", psi4.core.get_global_option('BASIS'))
 
-e_scf,ref_wfn = energy('mp2',return_wfn=True)
-
+ref_wfn.set_basisset("JKFIT",aux)
+ref_wfn.set_basisset("RIFIT",aux2)
 
 plugin("syshfwplug.so", ref_wfn)
-#syshfwplug.exampleFN(ref_wfn)
+
+#C = psi4.core.Matrix(ref_wfn.basisset().nbf(),ref_wfn.basisset().nbf())
+#df = psi4.core.DFTensor(ref_wfn.basisset(), aux, C, 5 , ref_wfn.basisset().nbf()-5 )
+
+#BQ2 = np.asarray(df.Qso())
+
+
+#mints = MintsHelper(ref_wfn.basisset())
+#I = np.asarray(mints.ao_eri())
+
+#print "Check some ints:"
+#for i in range(ref_wfn.basisset().nbf()):
+#	print "{:16.8f} {:16.8f} {:16.8f} ".format(I[i,0,0,0] , np.sum([BQ2[Q][i,0]*BQ2[Q][0][0] for Q in range(aux.nbf())]), np.sum([BQ[Q][i,0]*BQ[Q][0][0] for Q in range(aux.nbf())]))
+
+#syshfwplug.exampleFN(Qmn)

@@ -10,6 +10,12 @@
 #include "POSTHF/loc_mp2.h"
 #include "POSTHF/can_mp2.h"
 #include <iomanip>
+#include <omp.h>
+
+#define PWIDTH_L 12
+#define PWIDTH_R 16
+
+
 
 int main(int argc, char const *argv[]) {
   int worldsize = 1;
@@ -63,6 +69,8 @@ int main(int argc, char const *argv[]) {
 
   std::string sysfile;
   std::string wavefile;
+
+  double total_start = omp_get_wtime();
 
   print_header();
   if(argc != 2){
@@ -118,13 +126,19 @@ int main(int argc, char const *argv[]) {
    //diag_Fmat(nroao, Fmat,MOs,MOens,Som12, tmpmat);
   // delete[] tmpmat;
 //  --END-COREGUESS
-  //form_core_guess(nroao,Fmat,Hmat,Som12,MOs,MOens);
+  double testMOs = 0.0;
+  for (int i=0;i<nroao;i++){
+	  testMOs += MOs[i*nroao+i];
+  }
+  if (testMOs == 0.0)
+  {
+	  std::cout<<"\nForming core guess!\n";
+	  form_core_guess(nroao,Fmat,Hmat,Som12,MOs,MOens);
+  }
+
   run_scf(nroao,nroe,MOs,Pmat,Hmat,Fmat,intnums,intval,sortcount,nrofint,Som12,100,ion_rep);
 
-  std::cout << "Precalculating <oo|oo> up to <ov|vv>\n";
-  std::cout << nroe << '\n';
-  std::cout << nroe/2 << '\n';
-  std::cout << nroao << '\n';
+
   long long int prec_mem = (long long int) nroe/2*(long long int) nroao* (long long int) nroao* (long long int) nroao;
     std::cout << "Need " << prec_mem*sizeof(double) << " bytes (" << prec_mem*sizeof(double)/1024/1024 << " MB) for precalculation\n";
     std::cout << prec_mem << " doubles on "<< worldsize<< " cpus \n";
@@ -139,11 +153,11 @@ int main(int argc, char const *argv[]) {
   	}
 
     //4-index trans
-
+    double trafo_start = omp_get_wtime();
+    
     long long int kstep = nroao;
     long long int jstep = nroao*kstep;
     long long int istep = nroao*jstep;
-
     int i,j,k,l;
     long long int prec_count = 0;
     for(i = 0; i < nroe/2; i++){
@@ -159,6 +173,8 @@ int main(int argc, char const *argv[]) {
       std::cout << i << "\t"<<std::flush;
       if((i+1)%10==0) std::cout << "\n"<<std::flush;
     }
+
+    double trafo_end = omp_get_wtime();
 
     //
     //calculate the Hartree-Fock energy:
@@ -209,7 +225,7 @@ int main(int argc, char const *argv[]) {
       oneE += 2 * HMo[i*nroao + i];
     }
     oneE += ion_rep;
-    std::cout<<'\n'<<std::setw( 10 )<< "oneE:" <<std::setw( 16 )<<oneE<<'\n';
+    std::cout<<"\n\n\n"<<std::setw( PWIDTH_L )<< "oneE:" <<std::setw( 16 )<<oneE<<'\n';
 
     for (size_t i = 0; i < nroe/2; i++) {
       for (size_t j = 0; j < nroe/2; j++) {
@@ -218,12 +234,22 @@ int main(int argc, char const *argv[]) {
 
       }
     }
-    std::cout << std::setw( 10 ) << "twoE:" <<std::setw( 16 )<<twoE<< '\n';
-    std::cout << std::setw( 10 ) << "HF  :" <<std::setw( 16 )<<oneE+twoE<<'\n';
+  std::cout << std::setw( PWIDTH_L ) << "twoE:" <<std::setw( PWIDTH_R )<<twoE<< "\n";
+  std::cout << std::setw( PWIDTH_L ) << "HF:"   <<std::setw( PWIDTH_R )<<oneE+twoE<<"\n";
     ///END Hartree-Fock
 
+  double mp2_start = omp_get_wtime();
   run_canonical_mp2(nroe,nroao,prec_ints,FMo);
+  double mp2_end   = omp_get_wtime();
 
+  std::cout <<"\n\nTIMINGS:\n";
+  std::cout << std::setw( PWIDTH_L ) << "4-index [s]:" <<std::setw( PWIDTH_R )<<trafo_end-trafo_start<< "s \n";
+  std::cout << std::setw( PWIDTH_L ) << "MP2 [s]:" <<std::setw( PWIDTH_R )<<mp2_end-mp2_start<< "s \n";
+  
+
+  double total_end = omp_get_wtime();
+
+  std::cout<< std::setw( PWIDTH_L ) << "Total [s]:"<<std::setw( PWIDTH_R )<<total_end-total_start<<"s \n";
   std::cout << "\n\n--END--" << '\n';
   return 0;
 }
