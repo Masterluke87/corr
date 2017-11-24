@@ -72,8 +72,8 @@ SharedMatrix syshfwplug(SharedWavefunction ref_wfn, Options &options)
 	std::string pref = options.get_str("PREF");
 	bool dryrun = options.get_bool("DRYRUN");
 
-	std::clog << "Prefix " << pref << "\n";
-	std::clog << "Write sys " << doTei << "\n";
+	std::cout << "Prefix " << pref << "\n";
+	std::cout << "Write sys " << doTei << "\n";
 
 	std::string sysfn = pref + ".sys";
 	std::string hfawfn = pref + ".ahfw";
@@ -99,11 +99,11 @@ SharedMatrix syshfwplug(SharedWavefunction ref_wfn, Options &options)
 	const double cutoff2el = 1.e-12;
 
 	molecule->print();
-	std::clog << "Nr of atoms " <<  molecule->natom() << "\n";
+	std::cout << "Nr of atoms " <<  molecule->natom() << "\n";
 	std::shared_ptr<Matrix> coord (new Matrix(molecule->geometry()));
 
 
-	std::clog << "DEBUG";
+	std::cout << "DEBUG";
 	// Build a dimension object with a single dim since this is AO's
 
 	int nbf = aoBasis->nbf();
@@ -225,10 +225,9 @@ SharedMatrix syshfwplug(SharedWavefunction ref_wfn, Options &options)
 	double* MOsB;     //nroao*nroao
 
 	int aointl = nroao*nroao*8+nroa*5+2*nroao;
-	std::clog << "Need " <<  aointl*8 <<   " Bytes  for one el ints, coords, and charges and MOs.\n";
-	std::clog << "Need " <<  nrofint*8 <<  " Bytes  for two el indices and the same for two el values.\n";
-
-		std::clog<<"\nORBBAS\nSieve: "<<nrofint*8<<" bytes\n"<<"Total: "<<(long long int) nbf*nbf*nbf*nbf*8<<" bytes \n\n";
+	std::cout << "Need " <<  aointl*8 <<   " Bytes  for one el ints, coords, and charges and MOs.\n";
+	std::cout << "Need " <<  nrofint*8 <<  " Bytes  for two el indices and the same for two el values.\n";
+	std::cout<<"\nORBBAS\nSieve: "<<nrofint*8<<" bytes\n"<<"Total: "<<(long long int) nbf*nbf*nbf*nbf*8<<" bytes \n\n";
 
 
 	if (dryrun == false)
@@ -384,14 +383,14 @@ SharedMatrix syshfwplug(SharedWavefunction ref_wfn, Options &options)
 
 
 
-  std::clog<<"\n Starting JKFIT \n";
+  std::cout<<"\n Starting JKFIT \n";
 	auto aux = ref_wfn->get_basisset("JKFIT");
 
 	//calc Metric
 	std::shared_ptr<BasisSet> zero = BasisSet::zero_ao_basis_set();
 	std::shared_ptr<IntegralFactory> rifactory_J(new IntegralFactory(aux, zero, aux, zero));
 	int naux = aux->nbf();
-	std::clog<<"naux:"<<naux<<"\n";
+	std::cout<<"naux:"<<naux<<"\n";
 	std::shared_ptr<TwoBodyAOInt> Jint (rifactory_J->eri());
 	SharedMatrix AOmetric(new Matrix("AO Basis DF Metric", naux, naux));
 	double** W = AOmetric->pointer(0);
@@ -442,7 +441,7 @@ SharedMatrix syshfwplug(SharedWavefunction ref_wfn, Options &options)
 	delete[] eigval;
 	C_DGEMM('T','N',naux,naux,naux,1.0,Jcopyp[0],naux,vecp[0],naux,0.0,W[0],naux);
 
-	std::clog<<"\n Metric JKFIT done \n";
+	std::cout<<"\n Metric JKFIT done \n";
 	//end metrix
 
 
@@ -486,8 +485,8 @@ SharedMatrix syshfwplug(SharedWavefunction ref_wfn, Options &options)
 			}
 		}
 	}
-	std::clog<<"JKFIT\nSieve: "<<count*8<<" bytes\n"<<"Total: "<<(long long int)nbf*nbf*naux*8<<" bytes \n\n";
-	std::clog<<"\nnbf:"<<nbf<<"\nnaux1:"<<naux;
+	std::cout<<"JKFIT\nSieve: "<<count*8<<" bytes\n"<<"Total: "<<(long long int)nbf*nbf*naux*8<<" bytes \n\n";
+	std::cout<<"\nnbf:"<<nbf<<"\nnaux1:"<<naux;
 	//C_DGEMM('N','N',naux, nbf * nbf, naux, 1.0, W[0], naux, Bp[0], nbf * nbf, 0.0,
 	//        Ap[0], nbf * nbf);
 
