@@ -81,7 +81,11 @@ SharedMatrix syshfwplug(SharedWavefunction ref_wfn, Options &options)
 
 
 
+
 	std::shared_ptr<Molecule> molecule = ref_wfn->molecule();
+
+
+	std::shared_ptr<BasisSet> aoBasis2  = psi::BasisSet::pyconstruct(molecule);
 
 	// Form basis object:
 	std::shared_ptr<BasisSet> aoBasis = ref_wfn->basisset();
@@ -94,6 +98,14 @@ SharedMatrix syshfwplug(SharedWavefunction ref_wfn, Options &options)
 
 	//shared_ptr<Vector3> bal = molecule->xyz(0); ;
 	//    bal = molecule->xyz(0);
+
+	std::string info;
+
+	for(int i =0;i<aoBasis->nshell();i++){
+		std::cout<<aoBasis->shell(i).ncenter()<<"\n";
+		aoBasis->shell(i).print(info);
+		std::cout<<info<<"\n";
+	}
 
 
 	const double cutoff2el = 1.e-12;
