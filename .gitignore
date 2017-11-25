@@ -13,4 +13,4 @@ syshfwplug/pymodule.py~
 syshfwplug/CMakeCache.txt
 syshfwplug/psi.*
 syshfwplug/timer.dat
-
+*.swp

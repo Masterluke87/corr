@@ -16,7 +16,7 @@
 
 void print_header();
 int  rem_com(char* filename, char* streamstring, int string_length);
-void get_sys_size(std::string sysfile,int* nroe, int* nroao, int* nroa, long long int* nrofint);
+void get_sys_size(std::string sysfile,int* nroe, int* nroao, int* nroa, long long int* nrofint,char* basisName);
 void read_sys(std::string sysfile, double* coord, double* charges, double* mass,
 	      double* Hmat, double* Tmat, double* Smat,  double* Dx, double* Dy,
 	      double *Dz, long long int* sortcount, double* intval,

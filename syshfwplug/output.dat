@@ -18,9 +18,9 @@
     -----------------------------------------------------------------------
 
 
-    Psi4 started on: Friday, 24 November 2017 12:47PM
+    Psi4 started on: Friday, 24 November 2017 08:22PM
 
-    Process ID:  24382
+    Process ID:   2363
     PSIDATADIR: /home/luke/Projects/psi4_build/psi_6/share/psi4
     Memory:     500.0 MiB
     Threads:    1
@@ -55,7 +55,10 @@ set {
 set syshfwplug {
   pref mytest
   dryrun false
-  do_tei 1
+  do_tei true
+  do_oei true
+  do_rijk true
+  do_rimp2 true
   print 1
 }
 
@@ -120,20 +123,6 @@ plugin("syshfwplug.so", ref_wfn)
 Reading options from the SYSHFWPLUG block
 Calling plugin syshfwplug.so.
 
-
-    Molecular point group: c1
-    Full point group: D1h
-
-    Geometry (in Angstrom), charge = 0, multiplicity = 1:
-
-       Center              X                  Y                   Z               Mass       
-    ------------   -----------------  -----------------  -----------------  -----------------
-           O          0.000000000000     0.000000000000     0.000000000000    15.994914619560
-           H          1.000000000000     1.000000000000     0.000000000000     1.007825032070
-           H         -1.000000000000     1.000000000000     0.000000000000     1.007825032070
-
-
-    Nuclear repulsion energy:       6.25154529
 
 
 *** Psi4 exiting successfully. Buy a developer a beer!

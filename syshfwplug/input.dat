@@ -25,7 +25,10 @@ set {
 set syshfwplug {
   pref mytest
   dryrun false
-  do_tei 1
+  do_tei true
+  do_oei true
+  do_rijk true
+  do_rimp2 true
   print 1
 }
 

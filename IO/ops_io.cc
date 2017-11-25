@@ -104,7 +104,7 @@ void read_input(std::ifstream* inputfile)
 /* Read the system sizes form sysfile.                                           */
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
-void get_sys_size(std::string sysfile,int* nroe, int* nroao, int* nroa, long long int* nrofint){
+void get_sys_size(std::string sysfile,int* nroe, int* nroao, int* nroa, long long int* nrofint,char* basisName){
 
   ifstream inf(sysfile.c_str());
 
@@ -112,6 +112,7 @@ void get_sys_size(std::string sysfile,int* nroe, int* nroao, int* nroa, long lon
   inf.read((char *) nroao,   sizeof(int));
   inf.read((char *) nroa,    sizeof(int));
   inf.read((char *) nrofint, sizeof(long long int));
+  inf.read((char *) basisName, 32);
 
   inf.close();
 }
@@ -131,12 +132,15 @@ void read_sys(std::string sysfile, double* coord, double* charges, double* mass,
 
   int nroao, nroa, nroe;
   long long int nrofint;
-
+  char basisName[32];
   //SYSTEM DATA
   datf.read((char *) &nroe,  sizeof(int));
   datf.read((char *) &nroao , sizeof(int));
   datf.read((char *) &nroa  , sizeof(int));
   datf.read((char *) &nrofint,  sizeof(long long int));
+  datf.read((char *) basisName, 32);
+
+
   datf.read((char *) coord  , sizeof(double)*3*nroa);
   datf.read((char *) charges, sizeof(double)*nroa);
   datf.read((char *) mass,    sizeof(double)*nroa);
