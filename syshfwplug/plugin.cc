@@ -444,6 +444,8 @@ void run_export_mos(SharedWavefunction ref_wfn,std::string pref){
 	auto Calpha = std::make_shared<Matrix>(nroao,nroao);
 	auto Cbeta = std::make_shared<Matrix>(nroao,nroao);
 
+	Calpha->zero();
+	Cbeta->zero();
 
 	double* MOensA  = new double[nroao];   //nroao
 	double* MOensB  = new double[nroao];   //nroao
@@ -601,6 +603,7 @@ SharedWavefunction syshfwplug(SharedWavefunction ref_wfn, Options &options)
 	std::cout << "RIMP2       :" <<do_rimp2<< '\n';
 	std::cout << "DRYRUN      :" <<dryrun<< '\n';
 	std::cout << "PREF        :" <<pref<< '\n';
+	std::cout << "E           :" <<ref_wfn->reference_energy();
 
 
 	if (dryrun)

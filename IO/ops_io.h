@@ -27,3 +27,13 @@ void read_sys_1el(char* sysfile, double* coord, double* charges, double* mass,
 void write_wav_HF(std::string wavfile, int nroao, double* MOens, double* MOs);
 void read_wav_HF(std::string wavfile, int nroao, double* MOens, double* MOs);
 void output_matrix(double* mat,int nr_of_col, int nrop, std::ofstream *outf);
+
+void read_system(std::string filename, int* nroe,int* nroa,
+                  int* nroao, int* naux_1, int* naux_2,
+                  long long int* nrofint,long long int* nrofaux,long long int* nrofaux2,
+                  double** coord,double** charges,double** masses,
+                  std::string* basisNameOB, std::string* basisNameJK, std::string* basisNameRI);
+
+void read_oei(std::string filename,int nroao,double* Hmat,double* Tmat,double* Smat,double* Vmat);
+void read_tei(std::string filename,long long int nrofint,long long int* sortcount,double* intval,
+              unsigned short* intnums);

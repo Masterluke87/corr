@@ -11,6 +11,7 @@ syshfwplug/__init__.pyc
 syshfwplug/pymodule.pyc
 syshfwplug/pymodule.py~
 syshfwplug/CMakeCache.txt
+syshfwplug/*.so
 syshfwplug/psi.*
 syshfwplug/timer.dat
 *.swp

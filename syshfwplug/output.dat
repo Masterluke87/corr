@@ -18,10 +18,10 @@
     -----------------------------------------------------------------------
 
 
-    Psi4 started on: Friday, 24 November 2017 08:22PM
+    Psi4 started on: Monday, 27 November 2017 08:03AM
 
-    Process ID:   2363
-    PSIDATADIR: /home/luke/Projects/psi4_build/psi_6/share/psi4
+    Process ID:  19803
+    PSIDATADIR: /home/luke/Projects/psi4build/psi5/share/psi4
     Memory:     500.0 MiB
     Threads:    1
     
@@ -49,7 +49,7 @@ nocom
 }
 
 set {
-  basis def2-qzvpp
+  basis def2-svp
 }
 
 set syshfwplug {
@@ -66,8 +66,8 @@ set scf reference rhf
 set scf_type pk
 set scf PRINT_MOS  true
 
-#e_scf,ref_wfn = energy('mp2',return_wfn=True)
-ref_wfn = psi4.core.Wavefunction.build(mymol , psi4.core.get_global_option('BASIS'))
+e_scf,ref_wfn = energy('scf',return_wfn=True)
+#ref_wfn = psi4.core.Wavefunction.build(mymol , psi4.core.get_global_option('BASIS'))
 aux     = psi4.core.BasisSet.build(mymol, "DF_BASIS_SCF", "", "RIFIT", psi4.core.get_global_option('BASIS'))
 aux2    = psi4.core.BasisSet.build(mymol, "DF_BASIS_MP2", "", "JKFIT", psi4.core.get_global_option('BASIS'))
 
@@ -91,33 +91,374 @@ plugin("syshfwplug.so", ref_wfn)
 
 #syshfwplug.exampleFN(Qmn)
 --------------------------------------------------------------------------
-/home/luke/Projects/MP2-Project/src/syshfwplug/syshfwplug.so loaded.
+/home/luke/Projects/MP2_Project/corr/syshfwplug/syshfwplug.so loaded.
+
+*** tstart() called on luke-pc
+*** at Mon Nov 27 08:03:56 2017
+
    => Loading Basis Set <=
 
-    Name: DEF2-QZVPP
+    Name: DEF2-SVP
     Role: ORBITAL
     Keyword: BASIS
-    atoms 1   entry O          line   290 file /home/luke/Projects/psi4_build/psi_6/share/psi4/basis/def2-qzvpp.gbs 
-    atoms 2-3 entry H          line    15 file /home/luke/Projects/psi4_build/psi_6/share/psi4/basis/def2-qzvpp.gbs 
+    atoms 1   entry O          line   130 file /home/luke/Projects/psi4build/psi5/share/psi4/basis/def2-svp.gbs 
+    atoms 2-3 entry H          line    15 file /home/luke/Projects/psi4build/psi5/share/psi4/basis/def2-svp.gbs 
 
     There are an even number of electrons - assuming singlet.
     Specify the multiplicity in the molecule input block.
 
+
+         ---------------------------------------------------------
+                                   SCF
+            by Justin Turney, Rob Parrish, Andy Simmonett
+                             and Daniel Smith
+                              RHF Reference
+                        1 Threads,    500 MiB Core
+         ---------------------------------------------------------
+
+  ==> Geometry <==
+
+    Molecular point group: c1
+    Full point group: D1h
+
+    Geometry (in Angstrom), charge = 0, multiplicity = 1:
+
+       Center              X                  Y                   Z               Mass       
+    ------------   -----------------  -----------------  -----------------  -----------------
+           O          0.000000000000     0.000000000000     0.000000000000    15.994914619560
+           H          1.000000000000     1.000000000000     0.000000000000     1.007825032070
+           H         -1.000000000000     1.000000000000     0.000000000000     1.007825032070
+
+  Running in c1 symmetry.
+
+  Rotational constants: A =      8.36337  B =      8.36337  C =      4.18169 [cm^-1]
+  Rotational constants: A = 250727.55137  B = 250727.55137  C = 125363.77568 [MHz]
+  Nuclear repulsion =    6.251545286588714
+
+  Charge       = 0
+  Multiplicity = 1
+  Electrons    = 10
+  Nalpha       = 5
+  Nbeta        = 5
+
+  ==> Algorithm <==
+
+  SCF Algorithm Type is PK.
+  DIIS enabled.
+  MOM disabled.
+  Fractional occupation disabled.
+  Guess Type is SAD.
+  Energy threshold   = 1.00e-06
+  Density threshold  = 1.00e-06
+  Integral threshold = 0.00e+00
+
+  ==> Primary Basis <==
+
+  Basis Set: DEF2-SVP
+    Blend: DEF2-SVP
+    Number of shells: 12
+    Number of basis function: 24
+    Number of Cartesian functions: 25
+    Spherical Harmonics?: true
+    Max angular momentum: 2
+
+  ==> Pre-Iterations <==
+
+   -------------------------------------------------------
+    Irrep   Nso     Nmo     Nalpha   Nbeta   Ndocc  Nsocc
+   -------------------------------------------------------
+     A         24      24       0       0       0       0
+   -------------------------------------------------------
+    Total      24      24       5       5       5       0
+   -------------------------------------------------------
+
+  ==> Integral Setup <==
+
+  Using in-core PK algorithm.
+   Calculation information:
+      Number of atoms:                   3
+      Number of AO shells:              12
+      Number of primitives:             22
+      Number of atomic orbitals:        25
+      Number of basis functions:        24
+
+      Integral cutoff                 1.00e-12
+      Number of threads:                 1
+
+  Performing in-core PK
+  Using 90300 doubles for integral storage.
+  We computed 3081 shell quartets total.
+  Whereas there are 3081 unique shell quartets.
+  ==> DiskJK: Disk-Based J/K Matrices <==
+
+    J tasked:                  Yes
+    K tasked:                  Yes
+    wK tasked:                  No
+    Memory (MB):               375
+    Schwarz Cutoff:          1E-12
+
+    OpenMP threads:              1
+  Minimum eigenvalue in the overlap matrix is 8.0261237104E-02.
+  Using Symmetric Orthogonalization.
+
+  SCF Guess: Superposition of Atomic Densities via on-the-fly atomic UHF.
+
+  ==> Iterations <==
+
+                        Total Energy        Delta E     RMS |[F,P]|
+
+   @RHF iter   0:   -75.29103863295545   -7.52910e+01   2.78741e-02 
+   @RHF iter   1:   -75.68126016454480   -3.90222e-01   1.39967e-02 
+   @RHF iter   2:   -75.71349582498250   -3.22357e-02   1.37000e-02 DIIS
+   @RHF iter   3:   -75.75704721771240   -4.35514e-02   1.90386e-03 DIIS
+   @RHF iter   4:   -75.76056981648213   -3.52260e-03   9.22308e-04 DIIS
+   @RHF iter   5:   -75.76176434810343   -1.19453e-03   3.69597e-04 DIIS
+   @RHF iter   6:   -75.76202191859174   -2.57570e-04   1.02166e-04 DIIS
+   @RHF iter   7:   -75.76203987092622   -1.79523e-05   1.33184e-05 DIIS
+   @RHF iter   8:   -75.76204004766075   -1.76735e-07   3.96387e-06 DIIS
+   @RHF iter   9:   -75.76204006840497   -2.07442e-08   1.94338e-06 DIIS
+   @RHF iter  10:   -75.76204007603073   -7.62576e-09   4.18717e-07 DIIS
+
+  ==> Post-Iterations <==
+
+    Orbital Energies (a.u.)
+    -----------------------
+
+    Doubly Occupied:                                                      
+
+       1A    -20.620604     2A     -1.199973     3A     -0.518320  
+       4A     -0.508140     5A     -0.499343  
+
+    Virtual:                                                              
+
+       6A      0.082708     7A      0.125980     8A      0.616424  
+       9A      0.639899    10A      1.150184    11A      1.155309  
+      12A      1.323027    13A      1.388348    14A      1.604624  
+      15A      1.644961    16A      1.734172    17A      1.790439  
+      18A      1.813277    19A      2.091433    20A      3.045161  
+      21A      3.051482    22A      3.075948    23A      3.397543  
+      24A      3.582729  
+
+    Final Occupation by Irrep:
+              A 
+    DOCC [     5 ]
+
+  Energy converged.
+
+  @RHF Final Energy:   -75.76204007603073
+
+   => Energetics <=
+
+    Nuclear Repulsion Energy =              6.2515452865887138
+    One-Electron Energy =                -117.3344151568853562
+    Two-Electron Energy =                  35.3208297942659186
+    Total Energy =                        -75.7620400760307291
+
+
+
+Properties will be evaluated at   0.000000,   0.000000,   0.000000 Bohr
+
+Properties computed using the SCF density matrix
+
+  Nuclear Dipole Moment: (a.u.)
+     X:     0.0000      Y:     3.7795      Z:     0.0000
+
+  Electronic Dipole Moment: (a.u.)
+     X:    -0.0000      Y:    -2.7573      Z:     0.0000
+
+  Dipole Moment: (a.u.)
+     X:    -0.0000      Y:     1.0222      Z:     0.0000     Total:     1.0222
+
+  Dipole Moment: (Debye)
+     X:    -0.0000      Y:     2.5981      Z:     0.0000     Total:     2.5981
+
+
+  ==> Molecular Orbitals <==
+
+                            1            2            3            4            5
+
+ 1    O1 s0         0.9909405    0.2974209    0.0000098    0.0725470    0.0000070
+ 2    O1 s0        -0.0309801    0.6058294    0.0000217    0.1606333    0.0000157
+ 3    O1 s0         0.0125009    0.4347071    0.0000245    0.1900848    0.0000187
+ 4    O1 p0         0.0000000    0.0000002   -0.0000206   -0.0000616    0.6564115
+ 5    O1 p+1        0.0000000   -0.0000005    0.4720019   -0.0000616    0.0000143
+ 6    O1 p-1       -0.0015477    0.0194040   -0.0000650   -0.4758210   -0.0000423
+ 7    O1 p0        -0.0000000    0.0000001   -0.0000151   -0.0000453    0.4900586
+ 8    O1 p+1       -0.0000000   -0.0000005    0.3404060   -0.0000451    0.0000105
+ 9    O1 p-1        0.0023448    0.0190569   -0.0000491   -0.3642969   -0.0000330
+ 10   O1 d0        -0.0005100   -0.0027054    0.0000017    0.0123637    0.0000011
+ 11   O1 d+1        0.0000000   -0.0000000   -0.0000001   -0.0000000   -0.0000001
+ 12   O1 d-1       -0.0000000    0.0000000   -0.0000004   -0.0000010    0.0113506
+ 13   O1 d+2       -0.0000019   -0.0003231    0.0000011    0.0087772    0.0000008
+ 14   O1 d-2        0.0000000   -0.0000001    0.0230301   -0.0000030    0.0000007
+ 15   H2 s0        -0.0009278    0.0762082    0.2437941   -0.2191039   -0.0000137
+ 16   H2 s0        -0.0015639    0.0142818    0.1810521   -0.1487687   -0.0000095
+ 17   H2 p0         0.0000000   -0.0000000   -0.0000004   -0.0000012    0.0134370
+ 18   H2 p+1        0.0004721   -0.0100221   -0.0119608    0.0187675    0.0000014
+ 19   H2 p-1        0.0003450   -0.0091975   -0.0205993    0.0026083   -0.0000004
+ 20   H3 s0        -0.0009278    0.0762088   -0.2438516   -0.2190387   -0.0000293
+ 21   H3 s0        -0.0015639    0.0142816   -0.1810884   -0.1487180   -0.0000214
+ 22   H3 p0         0.0000000   -0.0000000   -0.0000004   -0.0000012    0.0134372
+ 23   H3 p+1       -0.0004721    0.0100222   -0.0119656   -0.0187644   -0.0000021
+ 24   H3 p-1        0.0003450   -0.0091976    0.0206002    0.0026029    0.0000009
+
+            Ene   -20.6206041   -1.1999726   -0.5183200   -0.5081401   -0.4993435
+            Sym             A            A            A            A            A
+            Occ             2            2            2            2            2
+
+
+                            6            7            8            9           10
+
+ 1    O1 s0         0.0716501    0.0000020   -0.0000036    0.0561217    0.2462974
+ 2    O1 s0         0.1062747    0.0000032   -0.0000176    0.2744746    1.2675824
+ 3    O1 s0         0.5124087    0.0000141    0.0000361   -0.5600729   -1.3013229
+ 4    O1 p0        -0.0000021    0.0000003   -0.0000000   -0.0000001   -0.0000353
+ 5    O1 p+1       -0.0000101    0.3961796    0.1677755    0.0000111   -0.0000022
+ 6    O1 p-1        0.3634333    0.0000105   -0.0000188    0.2852812   -0.5694330
+ 7    O1 p0        -0.0000022    0.0000004    0.0000001   -0.0000008    0.0000370
+ 8    O1 p+1       -0.0000134    0.5357464   -0.0640098   -0.0000032    0.0000016
+ 9    O1 p-1        0.4714130    0.0000143    0.0000048   -0.0763534    0.5813238
+ 10   O1 d0        -0.0003182    0.0000000   -0.0000019    0.0300213    0.0065930
+ 11   O1 d+1        0.0000000   -0.0000000    0.0000000    0.0000000   -0.0000000
+ 12   O1 d-1       -0.0000001    0.0000000    0.0000000   -0.0000000    0.0000007
+ 13   O1 d+2       -0.0062212   -0.0000003    0.0000003   -0.0056611   -0.0151494
+ 14   O1 d-2        0.0000001   -0.0038577   -0.0483987   -0.0000033   -0.0000000
+ 15   H2 s0        -0.1559464   -0.2084862   -0.9126415   -0.8906585   -0.0213035
+ 16   H2 s0        -0.5996653   -0.7470272    1.1046696    0.8058551    0.1198191
+ 17   H2 p0        -0.0000001    0.0000000    0.0000000   -0.0000001    0.0000072
+ 18   H2 p+1       -0.0102264   -0.0056541    0.0157146   -0.0522377   -0.0219564
+ 19   H2 p-1       -0.0054344   -0.0139924   -0.0200566   -0.0241836    0.1333298
+ 20   H3 s0        -0.1559592    0.2084796    0.9127584   -0.8905385   -0.0213034
+ 21   H3 s0        -0.5997079    0.7469928   -1.1047752    0.8057120    0.1198200
+ 22   H3 p0        -0.0000001    0.0000000   -0.0000000   -0.0000000    0.0000073
+ 23   H3 p+1        0.0102271   -0.0056538    0.0157079    0.0522404    0.0219572
+ 24   H3 p-1       -0.0054353    0.0139923    0.0200600   -0.0241810    0.1333308
+
+            Ene     0.0827085    0.1259800    0.6164240    0.6398993    1.1501840
+            Sym             A            A            A            A            A
+            Occ             0            0            0            0            0
+
+
+                           11           12           13           14           15
+
+ 1    O1 s0         0.0000098   -0.0000002    0.1867201   -0.0000000    0.0569694
+ 2    O1 s0         0.0000506   -0.0000010    1.0419200   -0.0000000    0.3047109
+ 3    O1 s0        -0.0000521    0.0000014   -1.2289678    0.0000000   -0.3124331
+ 4    O1 p0         0.8989848    0.0000004   -0.0000008   -0.0000063   -0.0000003
+ 5    O1 p+1       -0.0000003    0.9442400    0.0000017   -0.0000000    0.0000053
+ 6    O1 p-1       -0.0000224   -0.0000036    0.5920299   -0.0000001    0.5190639
+ 7    O1 p0        -0.9339682   -0.0000003    0.0000003    0.0000098   -0.0000001
+ 8    O1 p+1        0.0000006   -1.1949499   -0.0000020    0.0000001   -0.0000102
+ 9    O1 p-1        0.0000220    0.0000054   -0.7242937    0.0000002   -0.7255613
+ 10   O1 d0         0.0000002    0.0000001   -0.0266606    0.0000000   -0.0183035
+ 11   O1 d+1        0.0000001   -0.0000000   -0.0000000    0.1175569    0.0000000
+ 12   O1 d-1       -0.0173799   -0.0000000    0.0000000   -0.0000017    0.0000000
+ 13   O1 d+2       -0.0000006    0.0000001    0.0660802    0.0000000   -0.1442645
+ 14   O1 d-2       -0.0000000    0.0483556    0.0000002   -0.0000000    0.0000015
+ 15   H2 s0        -0.0000004    0.1478103    0.2991638   -0.0000000    0.2801972
+ 16   H2 s0         0.0000045    0.2914078    0.1473102   -0.0000000   -0.0494344
+ 17   H2 p0        -0.1844109   -0.0000001    0.0000003    0.6973593    0.0000005
+ 18   H2 p+1       -0.0000006   -0.1727872    0.2977854    0.0000002   -0.3236475
+ 19   H2 p-1        0.0000053    0.0825741   -0.2009868   -0.0000001    0.4948450
+ 20   H3 s0        -0.0000002   -0.1478141    0.2991638   -0.0000001    0.2801934
+ 21   H3 s0         0.0000047   -0.2914075    0.1473071    0.0000001   -0.0494379
+ 22   H3 p0        -0.1844133   -0.0000001    0.0000003   -0.6973791    0.0000002
+ 23   H3 p+1        0.0000007   -0.1727873   -0.2977907    0.0000000    0.3236521
+ 24   H3 p-1        0.0000053   -0.0825751   -0.2009890   -0.0000002    0.4948588
+
+            Ene     1.1553094    1.3230272    1.3883484    1.6046242    1.6449612
+            Sym             A            A            A            A            A
+            Occ             0            0            0            0            0
+
+
+                           16           17           18           19           20
+
+ 1    O1 s0        -0.0000001   -0.0000001    0.0000009    0.0718548    0.0000000
+ 2    O1 s0        -0.0000004   -0.0000000    0.0000069    0.7392211    0.0000000
+ 3    O1 s0         0.0000004   -0.0000008   -0.0000112   -1.4207882   -0.0000000
+ 4    O1 p0         0.3269245    0.0000000    0.0000001    0.0000000    0.0000003
+ 5    O1 p+1        0.0000001    0.3086923    0.0760241   -0.0000005    0.0000001
+ 6    O1 p-1       -0.0000004   -0.0000030    0.0000031    0.1168850    0.0000000
+ 7    O1 p0        -0.5519652    0.0000000   -0.0000001   -0.0000001   -0.0000004
+ 8    O1 p+1       -0.0000001   -0.5496423    0.4353130   -0.0000017   -0.0000001
+ 9    O1 p-1        0.0000005    0.0000043   -0.0000083   -0.8143794   -0.0000001
+ 10   O1 d0        -0.0000000   -0.0000001   -0.0000014   -0.3309890   -0.0000001
+ 11   O1 d+1        0.0000020   -0.0000000   -0.0000000   -0.0000000    0.9957103
+ 12   O1 d-1        0.1325397   -0.0000000    0.0000000    0.0000000   -0.0000071
+ 13   O1 d+2        0.0000000    0.0000020   -0.0000007   -0.0322305    0.0000010
+ 14   O1 d-2        0.0000000    0.0508312   -0.2557079    0.0000019   -0.0000001
+ 15   H2 s0        -0.0000002    0.1567685    0.0815093    0.2674340    0.0000001
+ 16   H2 s0         0.0000001   -0.0265772   -0.3869017    0.2959779    0.0000000
+ 17   H2 p0         0.6907361   -0.0000001    0.0000000   -0.0000000   -0.1340508
+ 18   H2 p+1        0.0000000    0.4763318    0.5053589   -0.6179166   -0.0000002
+ 19   H2 p-1       -0.0000002   -0.5202055    0.5026554   -0.4862854    0.0000001
+ 20   H3 s0        -0.0000001   -0.1567714   -0.0815025    0.2674353   -0.0000000
+ 21   H3 s0        -0.0000001    0.0265789    0.3869048    0.2959742   -0.0000000
+ 22   H3 p0         0.6907156   -0.0000000    0.0000002   -0.0000000    0.1340525
+ 23   H3 p+1       -0.0000001    0.4763242    0.5053674    0.6179110    0.0000001
+ 24   H3 p-1       -0.0000000    0.5201940   -0.5026576   -0.4862809    0.0000002
+
+            Ene     1.7341720    1.7904394    1.8132766    2.0914332    3.0451608
+            Sym             A            A            A            A            A
+            Occ             0            0            0            0            0
+
+
+                          21           22           23           24
+
+ 1    O1 s0         0.0000000    0.0008014    0.0443497    0.0000001
+ 2    O1 s0         0.0000001    0.0115600    0.4715272    0.0000011
+ 3    O1 s0        -0.0000002   -0.0293793   -0.9060891   -0.0000023
+ 4    O1 p0         0.0431185   -0.0000001    0.0000001   -0.0000000
+ 5    O1 p+1        0.0000000   -0.0000001   -0.0000002    0.0975125
+ 6    O1 p-1       -0.0000002   -0.0394440    0.1210537    0.0000001
+ 7    O1 p0        -0.0736239    0.0000002   -0.0000000    0.0000000
+ 8    O1 p+1       -0.0000000   -0.0000001    0.0000008   -0.5019429
+ 9    O1 p-1        0.0000001    0.0540079   -0.5863643   -0.0000014
+ 10   O1 d0         0.0000003    0.0877825    0.9712040    0.0000017
+ 11   O1 d+1       -0.0000071    0.0000010   -0.0000000   -0.0000001
+ 12   O1 d-1       -0.9937654    0.0000031    0.0000001    0.0000001
+ 13   O1 d+2       -0.0000031   -0.9888203    0.0803552   -0.0000000
+ 14   O1 d-2       -0.0000001    0.0000002    0.0000021   -1.0304347
+ 15   H2 s0        -0.0000000   -0.0129454    0.3057220    0.1986824
+ 16   H2 s0         0.0000001    0.0173176    0.1386755    0.1697866
+ 17   H2 p0         0.1503640   -0.0000006    0.0000000    0.0000000
+ 18   H2 p+1        0.0000003    0.1152294   -0.3864524   -0.2910471
+ 19   H2 p-1       -0.0000005   -0.1439499   -0.2916417   -0.3548178
+ 20   H3 s0        -0.0000000   -0.0129455    0.3057227   -0.1986810
+ 21   H3 s0         0.0000001    0.0173176    0.1386760   -0.1697858
+ 22   H3 p0         0.1503618   -0.0000003   -0.0000000   -0.0000000
+ 23   H3 p+1       -0.0000003   -0.1152290    0.3864531   -0.2910451
+ 24   H3 p-1       -0.0000005   -0.1439495   -0.2916427    0.3548160
+
+            Ene     3.0514820    3.0759475    3.3975425    3.5827286
+            Sym             A            A            A            A
+            Occ             0            0            0            0
+
+
+*** tstop() called on luke-pc at Mon Nov 27 08:03:57 2017
+Module time:
+	user time   =       0.76 seconds =       0.01 minutes
+	system time =       0.03 seconds =       0.00 minutes
+	total time  =          1 seconds =       0.02 minutes
+Total time:
+	user time   =       0.76 seconds =       0.01 minutes
+	system time =       0.03 seconds =       0.00 minutes
+	total time  =          1 seconds =       0.02 minutes
    => Loading Basis Set <=
 
-    Name: (DEF2-QZVPP AUX)
+    Name: (DEF2-SVP AUX)
     Role: RIFIT
     Keyword: DF_BASIS_SCF
-    atoms 1   entry O          line   406 file /home/luke/Projects/psi4_build/psi_6/share/psi4/basis/def2-qzvpp-ri.gbs 
-    atoms 2-3 entry H          line    24 file /home/luke/Projects/psi4_build/psi_6/share/psi4/basis/def2-qzvpp-ri.gbs 
+    atoms 1   entry O          line   233 file /home/luke/Projects/psi4build/psi5/share/psi4/basis/def2-svp-ri.gbs 
+    atoms 2-3 entry H          line    22 file /home/luke/Projects/psi4build/psi5/share/psi4/basis/def2-svp-ri.gbs 
 
    => Loading Basis Set <=
 
-    Name: (DEF2-QZVPP AUX)
+    Name: (DEF2-SVP AUX)
     Role: JKFIT
     Keyword: DF_BASIS_MP2
-    atoms 1   entry O          line   323 file /home/luke/Projects/psi4_build/psi_6/share/psi4/basis/def2-qzvpp-jkfit.gbs 
-    atoms 2-3 entry H          line    23 file /home/luke/Projects/psi4_build/psi_6/share/psi4/basis/def2-qzvpp-jkfit.gbs 
+    atoms 1   entry O          line   323 file /home/luke/Projects/psi4build/psi5/share/psi4/basis/def2-svp-jkfit.gbs 
+    atoms 2-3 entry H          line    23 file /home/luke/Projects/psi4build/psi5/share/psi4/basis/def2-svp-jkfit.gbs 
 
 
 Reading options from the SYSHFWPLUG block

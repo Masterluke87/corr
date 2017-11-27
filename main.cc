@@ -22,55 +22,22 @@ int main(int argc, char const *argv[]) {
 	int worldsize = 1;
 	int rank = 0;
 
+	int            nroe;       //Nr of electrons  (if negative, read in center of mass)
+  int            nroao;
+	int            nroa;
+	int            naux_1;
+	int            naux_2;
 
-	int nroe;                   //Nr of electrons  (if negative, read in center of mass)
-	int llim;                   //first MO used for correlation
-	int ulim;                //last  MO used for correlation
-	int nroao;
-	int nroa;
-	long long int nrofint;    //Nr of two electron Integrals
+	long long int  nrofint;    //Nr of two electron Integrals
+	long long int  nrofaux;
+	long long int  nrofaux2;
 
-	double* intval;
-	unsigned short* intnums;
-	long long int sortcount[4];
-
-	double* dumd;
-	double*        Dx;          //Dipole X                          nroao*nroao
-	double*        Dy;            //Dipole Y                          nroao*nroao
-	double*        Dz;            //Dipole Z                          nroao*nroao
-	//atoms
 	double*        coord;       //atomic coordinats               3*nroa
 	double*        charges;     //atomic charges                    nroa
 	double*        mass;        //atomic masses                     nroa
-
-	//one electron mat&vecs
-	double*        Smat;        //Overlap matrix S                  nroao*nroao
-	double*        Hmat;        //one electron Hamiltionian         nroao*nroao
-	double*        Tmat;        //Kinetic energy operator           nroao*nroao
-	double*        Som12;       //S^-1/2                            nroao*nroao
-	double*        Pmat_old;    //Old density matrix                nroao*nroao
-	double*        Fmat;        //Fock matrix                       nroao*nroao
-	double*        MOens;       //MO Energies
-	double*        MOens_old;   //Old MO energies;                  nroao
-	double* e1pmat;
-
-	//Temporary memory spaces
-	double*  tmpvecs;              //                               nroao*nroao
-	double*  tmpvals;              //                               nroao
-	double*  tmpmat1;              //                               nroao*nroao
-	double*  tmpmat2;              //
-
-	double mu_core[3];
-	double*        Pmat;        //density matrix                    nroao*nroao
-	double*        MOs;         //MO coeffs
-	double ion_rep;
-
-	double* prec_ints;
-
-
-	std::string sysfile;
-	std::string wavefile;
-  char basisName_input[32];
+	std::string    basisNameOB;
+	std::string 	 basisNameJK;
+	std::string 	 basisNameRI;
 
 	double total_start = omp_get_wtime();
 	print_header();
@@ -80,9 +47,141 @@ int main(int argc, char const *argv[]) {
 		exit(1);
 	}
 
+	std::string prefix = argv[1];
+
+	read_system(prefix+".sys",&nroe,&nroa,&nroao,&naux_1,
+	 								 &naux_2,&nrofint,&nrofaux,&nrofaux2,&coord,
+									 &charges,&mass,&basisNameOB,&basisNameJK,&basisNameRI);
+
+	double ion_rep =  calc_ion_rep( nroa, coord, charges);
+
+	{  //output
+
+		std::cout << "\nSYSTEMDATA" << '\n';
+		std::cout << "----------" << "\n\n";
+		std::cout<<std::setw(-2)<<"Z" <<std::setw(10)<<"x" <<std::setw(10) << "y" <<std::setw(10)<< "z" <<'\n';
+		for (size_t i = 0; i < nroa; i++) {
+	   	std::cout<<std::setw(-2)<<charges[i]<<std::setw(10)<< coord[i*3+0]<<std::setw(10) << coord[i*3+1]<<std::setw(10)<< coord[i*3+2]<<'\n';
+	 	}
+
+		std::cout << "nroe          :" << nroe<<'\n';
+		std::cout << "nroa          :" << nroa<<'\n';
+		std::cout << "nroao         :" << nroao<<'\n';
+		std::cout << "naux-JK       :" << naux_1<<'\n';
+		std::cout << "naux-RI       :" << naux_2<<'\n';
+		std::cout << "nrofint       :" << nrofint<<'\n';
+		std::cout << "nrofaux(JK)   :" << nrofaux<<'\n';
+		std::cout << "nrofaux(RI)   :" << nrofaux2<< '\n';
+		std::cout << "basisName(OB) :" << basisNameOB<<'\n';
+		std::cout << "basisName(JK) :" << basisNameJK<<'\n';
+		std::cout << "basisName(RI) :" << basisNameRI<<'\n';
+  }
+
+
+	double* dumd;
+	//one electron mat&vecs
+	double*        Hmat;        //one electron Hamiltionian         nroao*nroao
+	double*        Tmat;        //Kinetic energy operator           nroao*nroao
+	double*        Smat;        //Overlap matrix S                  nroao*nroao
+	double*        Som12;       //S^-1/2                            nroao*nroao
+	double*        Vmat;        //Nuclear repuslsion
+
+	double*        MOens;       //MO Energies
+	double*        MOs;         //MO coeffs
+  double*        Pmat;        //density matrix                    nroao*nroao
+  double*        Fmat;
+
+	double*        Tmat_libint;
+	double*        Hmat_libint;
+	double* 			 Smat_libint;
+	double* 			 Vmat_libint;
+
+	double*        Tmat_trans;
+	double*        Hmat_trans;
+	double*        Smat_trans;
+  double*        Vmat_trans;
+
+	dumd = new double[17*nroao*nroao];
+	int inc = 0;
+
+	Hmat  = &(dumd[inc]); inc+=nroao*nroao;
+	Tmat  = &(dumd[inc]); inc+=nroao*nroao;
+	Smat  = &(dumd[inc]); inc+=nroao*nroao;
+	Som12 = &(dumd[inc]); inc+=nroao*nroao;
+	Vmat  = &(dumd[inc]); inc+=nroao*nroao;
+
+	MOens = &(dumd[inc]); inc+=nroao*nroao;
+	MOs   = &(dumd[inc]); inc+=nroao*nroao;
+  Pmat  = &(dumd[inc]); inc+=nroao*nroao;
+	Fmat  = &(dumd[inc]); inc+=nroao*nroao;
+	Tmat_libint = &(dumd[inc]); inc+=nroao*nroao;
+	Hmat_libint = &(dumd[inc]); inc+=nroao*nroao;
+
+	Smat_libint = &(dumd[inc]); inc+=nroao*nroao;
+	Vmat_libint = &(dumd[inc]); inc+=nroao*nroao;
+  Tmat_trans = &(dumd[inc]); inc+=nroao*nroao;
+	Hmat_trans = &(dumd[inc]); inc+=nroao*nroao;
+	Smat_trans = &(dumd[inc]); inc+=nroao*nroao;
+
+	Vmat_trans = &(dumd[inc]); inc+=nroao*nroao;
+
+	read_oei(prefix+".oei",nroao,Hmat,Tmat, Smat,Vmat);
+	calculate_libint_oei(coord,charges,basisNameOB,nroa,
+		 Hmat,        Tmat       , Smat       , Vmat,
+		 Hmat_libint, Tmat_libint, Smat_libint, Vmat_libint,
+		 Hmat_trans , Tmat_trans , Smat_trans , Vmat_trans);
+
+	read_wav_HF(prefix+".ahfw",nroao,MOens,MOs);
+
+	{ //check of gd orbitals are provided;
+		double modiag=0.0;
+		for (size_t i = 0; i < nroao; i++) {
+			modiag += MOs[i*nroao+i];
+		}
+		if (std::fabs(modiag) < 0.1){
+			std::cout << "No converged MOs provided... doing core guess" << '\n';
+			for (int i =0;i<nroao*nroao;i++)
+				     Fmat[i] = Hmat[i];
+		  double *tmpmat = new double[nroao*nroao];
+			diag_Fmat(nroao, Fmat,MOs,MOens,Som12, tmpmat);
+			delete[] tmpmat;
+		}
+	}
+
+
+	double* intval;
+	unsigned short* intnums;
+	long long int sortcount[4];
+
+	if (nrofint > 0){
+		std::cout << "Two electron integrals provided, reading in .." << '\n';
+		intval        = new double[nrofint];                   //two electron integrals
+		intnums       = new unsigned short[nrofint*4];         //two electron indices
+		read_tei(prefix+".tei",nrofint,sortcount,intval,intnums);
+		calc_S12(nroao, Smat, Som12);
+		run_scf(nroao,nroe,MOs,Pmat,Hmat,Fmat,intnums,intval,sortcount,nrofint,Som12,100,ion_rep);
+	}else{
+		std::cout << "No Tei's provided ... using libint to calculate them" << '\n';
+
+	}
+
+
+
+
+
+
+/*
+	double* prec_ints;
+
+
+	std::string sysfile;
+	std::string wavefile;
+  char basisName_input[32];
+
+
+
 	sysfile  = std::string(argv[1])+".sys";
 	wavefile = std::string(argv[1])+".ahfw";
-	get_sys_size(sysfile,&nroe, &nroao, &nroa,  &nrofint,basisName_input);
 
   //trim basisName
   std::string basisName;
@@ -263,7 +362,7 @@ int main(int argc, char const *argv[]) {
 
 
 	libint2::finalize();
-
+*/
 //some core guess for testing
 	// for (int i =0;i<nroao*nroao;i++)
 	//	     Fmat[i] = Hmat[i];

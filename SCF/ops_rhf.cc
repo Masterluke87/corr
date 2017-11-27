@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include "ops_rhf.h"
 #include <omp.h>
+#include <libint2.hpp>
 
 using namespace std;
 
@@ -29,6 +30,178 @@ double calc_op_1el(int nroao, double* opmat, double* Pmat);
 extern void diag_mat(int nroao, double* mat, double* vals, double* vecs);
 extern void symmortho_mat(int nroao, double *mat, double* tmat, double* dummat);
 extern void transform_MOs(int nroao, double *MOs, double* tmat, double* tmpvec);
+
+
+void calculate_libint_oei(double* coord,double* charges,std::string basisName,int nroa,
+	double* Hmat       ,double* Tmat       ,double* Smat       ,double* Vmat,
+	double* Hmat_libint,double* Tmat_libint,double* Smat_libint,double* Vmat_libint,
+	double* Hmat_trans ,double* Tmat_trans ,double* Smat_trans ,double* Vmat_trans)
+{
+	std::cout << "Starting libint2 - part" << '\n';
+	libint2::initialize();
+  std::vector<libint2::Atom> atoms(nroa);
+  for (size_t i = 0; i < nroa; i++) {
+    atoms[i].atomic_number = charges[i];
+    atoms[i].x = coord[i*3+0];
+    atoms[i].y = coord[i*3+1];
+    atoms[i].z = coord[i*3+2];
+  }
+
+	libint2::BasisSet obs(basisName,atoms);
+	obs.set_pure(true);
+
+	libint2::Engine s_engine(libint2::Operator::overlap,obs.max_nprim(),obs.max_l());
+	libint2::Engine t_engine(libint2::Operator::kinetic,obs.max_nprim(),obs.max_l());
+	libint2::Engine v_engine(libint2::Operator::nuclear,obs.max_nprim(),obs.max_l());
+	v_engine.set_params(make_point_charges(atoms));
+
+	int nroao = obs.nbf();
+
+	auto shell2bf = obs.shell2bf();
+	std::vector<int> one_shift;
+	std::vector<int> two_shift;
+  int one_size = 0;
+  int two_size = 0;
+	const auto& buf_vec_t = t_engine.results();
+	const auto& buf_vec_s = s_engine.results();
+	const auto& buf_vec_v = v_engine.results();
+
+	for(auto s1=0; s1!=obs.size(); ++s1) {
+		for(auto s2=0; s2!=obs.size(); ++s2) {
+			t_engine.compute(obs[s1], obs[s2]);
+			s_engine.compute(obs[s1], obs[s2]);
+			v_engine.compute(obs[s1], obs[s2]);
+
+			auto ints_shellset_t = buf_vec_t[0];
+			auto ints_shellset_s = buf_vec_s[0];
+			auto ints_shellset_v = buf_vec_v[0];
+
+			auto bf1 = shell2bf[s1]; // first basis function in first shell
+			auto n1 = obs[s1].size(); // number of basis functions in first shell
+			auto bf2 = shell2bf[s2]; // first basis function in second shell
+			auto n2 = obs[s2].size(); // number of basis functions in second shell
+
+			//libint order is -l,-l+1...0,1,...l
+			if (obs[s1].contr[0].l == 0) {
+				one_shift = {0};
+        one_size  = 1;
+			}
+			if (obs[s2].contr[0].l == 0) {
+				two_shift = {0};
+        two_size  = 1;
+			}
+
+			if (obs[s1].contr[0].l == 1) {
+				one_shift = {+2,-1, -1 };
+        one_size  = 3;
+			}
+			if (obs[s2].contr[0].l == 1) {
+				two_shift = {+2,-1, -1 };
+        two_size  = 3;
+			}
+			if (obs[s1].contr[0].l == 2) {
+				one_shift = {+4,+1,-2,-2,-1};
+        one_size  = 5;
+			}
+			if (obs[s2].contr[0].l == 2) {
+				two_shift = {+4,+1,-2,-2,-1};
+        two_size  = 5;
+			}
+
+      if (obs[s1].contr[0].l == 3) {
+				one_shift = {+6,+3,0,-3,-3,-2,-1};
+        one_size  = 7;
+			}
+			if (obs[s2].contr[0].l == 3) {
+				two_shift = {+6,+3,0,-3,-3,-2,-1};
+        two_size  = 7;
+			}
+
+      if (obs[s1].contr[0].l == 4) {
+				one_shift = {+8,+5,+2,-1,-4,-4,-3,-2,-1};
+        one_size  = 9;
+			}
+			if (obs[s2].contr[0].l == 4) {
+				two_shift = {+8,+5,+2,-1,-4,-4,-3,-2,-1};
+        two_size  = 9;
+			}
+			// integrals are packed into ints_shellset in row-major (C) form
+			// this iterates over integrals in this order
+			for(auto f1=0; f1!=n1; ++f1)
+				for(auto f2=0; f2!=n2; ++f2) {
+					Tmat_libint[(bf1+f1)*obs.nbf() + (bf2+f2)] = ints_shellset_t[f1*n2+f2];
+					Smat_libint[(bf1+f1)*obs.nbf() + (bf2+f2)] = ints_shellset_s[f1*n2+f2];
+					Vmat_libint[(bf1+f1)*obs.nbf() + (bf2+f2)] = ints_shellset_v[f1*n2+f2];
+
+          Tmat_trans[(bf1+f1)*obs.nbf() + (bf2+f2)] = Tmat[(bf1+f1+one_shift[f1])*obs.nbf() + (bf2+f2+two_shift[f2])];
+          Smat_trans[(bf1+f1)*obs.nbf() + (bf2+f2)] = Smat[(bf1+f1+one_shift[f1])*obs.nbf() + (bf2+f2+two_shift[f2])];
+					Vmat_trans[(bf1+f1)*obs.nbf() + (bf2+f2)] = Vmat[(bf1+f1+one_shift[f1])*obs.nbf() + (bf2+f2+two_shift[f2])];
+
+          Hmat_trans[(bf1+f1)*obs.nbf() + (bf2+f2)] = Hmat[(bf1+f1+one_shift[f1])*obs.nbf() + (bf2+f2+two_shift[f2])];
+				}
+		}
+	}
+		for (size_t i = 0; i < nroao*nroao; i++) {
+			Hmat_libint[i] = Tmat_libint[i] + Vmat_libint[i];
+		}
+
+    double tmatdiff = 0;
+    double smatdiff = 0;
+		double vmatdiff = 0;
+		double hmatdiff = 0;
+
+    double tmatmax = 0;
+    double smatmax = 0;
+		double vmatmax = 0;
+		double hmatmax = 0;
+
+
+    for (size_t i = 0; i < nroao*nroao; i++) {
+      tmatdiff += fabs(Tmat_trans[i] - Tmat_libint[i]);
+      smatdiff += fabs(Smat_trans[i] - Smat_libint[i]);
+			vmatdiff += fabs(Vmat_trans[i] - Vmat_libint[i]);
+			hmatdiff += fabs(Hmat_trans[i] - Hmat_libint[i]);
+
+      if (fabs(Tmat_trans[i] - Tmat_libint[i])>tmatmax)
+        tmatmax = fabs(Tmat_trans[i] - Tmat_libint[i]);
+      if (fabs(Smat_trans[i] - Smat_libint[i]) > smatmax)
+        smatmax = fabs(Smat_trans[i] - Smat_libint[i]);
+			if (fabs(Vmat_trans[i] - Vmat_libint[i]) > vmatmax)
+	      vmatmax = fabs(Vmat_trans[i] - Vmat_libint[i]);
+			if (fabs(Hmat_trans[i] - Hmat_libint[i]) > hmatmax)
+		    hmatmax = fabs(Hmat_trans[i] - Hmat_libint[i]);
+
+
+    }
+
+  std::cout << "Capability check (did the transformation work?): " << '\n';
+	std::cout << "tmatdiff:" <<tmatdiff << '\n';
+	std::cout << "smatdiff:" <<smatdiff << '\n';
+	std::cout << "vmatdiff:" <<vmatdiff << '\n';
+	std::cout << "hmatdiff:" <<hmatdiff << '\n';
+
+  std::cout << "tmatmax :" <<tmatmax << '\n';
+	std::cout << "smatmax :" <<smatmax << '\n';
+	std::cout << "vmatmax :" <<vmatmax << '\n';
+	std::cout << "hmatmax :" <<hmatmax << '\n';
+
+  if (smatmax < 1E-10 && tmatmax<1E-10 && hmatmax<1E-10 && vmatmax<1E-10){
+    std::cout << "It seems the transformation worked" << '\n';
+  }
+
+
+
+	libint2::finalize();
+}
+
+
+
+
+
+
+
+
+
 
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 /*               calc_r_ab                                                       */
@@ -108,8 +281,13 @@ void calc_mu_core(int nroa, double* coord, double* charges, double* point,
 /* returns mimum eigenvalue of S                                                 */
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
-double calc_S12(int nroao, double* Smat, double* Som12, double* tmpmat,
-		double* tmpvecs, double* tmpvals){
+double calc_S12(int nroao, double* Smat, double* Som12){
+
+	double* tmpspace = new double[3*nroao*nroao];
+	int inc=0;
+	double* tmpmat = &(tmpspace[inc]);inc+=nroao*nroao;
+	double* tmpvecs = &(tmpspace[inc]);inc+=nroao*nroao;
+	double* tmpvals = &(tmpspace[inc]);
 
   diag_mat(nroao, Smat, tmpvals, tmpvecs);
 
@@ -136,7 +314,7 @@ double calc_S12(int nroao, double* Smat, double* Som12, double* tmpmat,
         Som12[x*nroao+y] += tmpvecs[z*nroao+y] * tmpmat[x*nroao+z];
     }
   }
-
+	delete[] tmpspace;
   return(min_val);
 }
 
