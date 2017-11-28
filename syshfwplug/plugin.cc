@@ -513,10 +513,12 @@ void run_export_sys(SharedWavefunction ref_wfn,std::string pref,
 	double* Coord   = new double[3*nroa];
 	int* mass       = new int[nroa];
 	double* charges = new double[nroa];
+	double* zeff    = new double[nroa];
 
 
 	for (int j=0; j<molecule->natom(); j++) {
-		charges[j] = molecule->Z(j);
+		charges[j] = molecule->charge(j);
+		zeff[j]    = molecule->Z(j);
 		mass[j]    = molecule->mass(j);
 		for (int i=0; i<3; i++) {
 			Coord[3*j+i] = coord->get(j,i);
@@ -526,7 +528,7 @@ void run_export_sys(SharedWavefunction ref_wfn,std::string pref,
 	std::cout << "\nSYSTEMDATA" << '\n';
 	std::cout << "----------" << "\n\n";
 	for (size_t i = 0; i < nroa; i++) {
-    std::cout<<std::setw(2)<<charges[i]<<std::setw(10)<< Coord[i*3+0]<<std::setw(10) << Coord[i*3+1]<<std::setw(10)<< Coord[i*3+2]<<'\n';
+    std::cout<<std::setw(2)<<charges[i]<<std::setw(10)<<zeff[i]<< std::setw(10)<< Coord[i*3+0]<<std::setw(10) << Coord[i*3+1]<<std::setw(10)<< Coord[i*3+2]<<'\n';
   }
 
 	std::cout << "nroe          :" << nroe<<'\n';
@@ -554,6 +556,7 @@ void run_export_sys(SharedWavefunction ref_wfn,std::string pref,
 	datf.write((char *) &nrofaux2,  sizeof(long long int));
 	datf.write((char *) Coord, sizeof(double)*3*nroa);
 	datf.write((char *) charges, sizeof(double)*nroa);
+	datf.write((char *) zeff, sizeof(double)*nroa);
 	datf.write((char *) mass,    sizeof(double)*nroa);
 	datf.write((char *) basisNameOB.c_str(),basisNameOB.size());
 	datf.write((char *) basisNameJK.c_str(),basisNameJK.size());
@@ -602,8 +605,11 @@ SharedWavefunction syshfwplug(SharedWavefunction ref_wfn, Options &options)
 	std::cout << "RIJK        :" <<do_rijk<< '\n';
 	std::cout << "RIMP2       :" <<do_rimp2<< '\n';
 	std::cout << "DRYRUN      :" <<dryrun<< '\n';
-	std::cout << "PREF        :" <<pref<< '\n';
-	std::cout << "E           :" <<ref_wfn->reference_energy();
+	std::cout << "PREF        :" <<pref<< "\n\n";
+
+	std::cout << "E           :" <<ref_wfn->reference_energy()<< "\n";
+	std::cout << "max_am      :" <<ref_wfn->basisset()->max_am() << "\n";
+
 
 
 	if (dryrun)

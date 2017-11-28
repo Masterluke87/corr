@@ -14,4 +14,5 @@ syshfwplug/CMakeCache.txt
 syshfwplug/*.so
 syshfwplug/psi.*
 syshfwplug/timer.dat
+syshfwplug/output.dat
 *.swp

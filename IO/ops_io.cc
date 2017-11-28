@@ -44,7 +44,7 @@ void print_header(){
 void read_system(std::string filename,int* nroe,int* nroa,
                   int* nroao, int* naux_1, int* naux_2,
                   long long int* nrofint,long long int* nrofaux,long long int* nrofaux2,
-                  double** coord,double** charges,double** mass,
+                  double** coord,double** charges,double** zeff, double** mass,
                   std::string* basisNameOB, std::string* basisNameJK, std::string* basisNameRI)
 {
   char bs1[32];
@@ -66,10 +66,12 @@ void read_system(std::string filename,int* nroe,int* nroa,
 
   *coord   = new double[3*(*nroa)];
   *charges = new double[(*nroa)];
+  *zeff    = new double[(*nroa)];
   *mass    = new double[(*nroa)];
 
   datf.read((char *) *coord, sizeof(double)*3*(*nroa));
   datf.read((char *) *charges, sizeof(double)*(*nroa));
+  datf.read((char *) *zeff, sizeof(double)*(*nroa));
   datf.read((char *) *mass,    sizeof(double)*(*nroa));
   datf.read((char *) bs1,32);
   datf.read((char *) bs2,32);

@@ -31,7 +31,7 @@ void output_matrix(double* mat,int nr_of_col, int nrop, std::ofstream *outf);
 void read_system(std::string filename, int* nroe,int* nroa,
                   int* nroao, int* naux_1, int* naux_2,
                   long long int* nrofint,long long int* nrofaux,long long int* nrofaux2,
-                  double** coord,double** charges,double** masses,
+                  double** coord,double** charges,double** zeff,double** masses,
                   std::string* basisNameOB, std::string* basisNameJK, std::string* basisNameRI);
 
 void read_oei(std::string filename,int nroao,double* Hmat,double* Tmat,double* Smat,double* Vmat);

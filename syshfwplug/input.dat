@@ -10,25 +10,24 @@ plugin_load("./syshfwplug.so")
 
 
 molecule mymol {
-O  0.0 0.0 0.0
-H  1.0 1.0 0.0
-H -1.0 1.0 0.0
+#O  0.0 0.0 0.0
+#H  1.0 1.0 0.0
+Au -1.0 0.0 0.0
+Au 1.5 0.0 0.0
 symmetry c1
-noreorient 
-nocom
 }
 
 set {
-  basis def2-svp
+  basis def2-qzvpp
 }
 
 set syshfwplug {
   pref mytest
   dryrun false
-  do_tei true
+  do_tei false
   do_oei true
-  do_rijk true
-  do_rimp2 true
+  do_rijk false
+  do_rimp2 false
   print 1
 }
 
@@ -36,8 +35,8 @@ set scf reference rhf
 set scf_type pk
 set scf PRINT_MOS  true
 
-e_scf,ref_wfn = energy('scf',return_wfn=True)
-#ref_wfn = psi4.core.Wavefunction.build(mymol , psi4.core.get_global_option('BASIS'))
+#e_scf,ref_wfn = energy('scf',return_wfn=True)
+ref_wfn = psi4.core.Wavefunction.build(mymol , psi4.core.get_global_option('BASIS'))
 aux     = psi4.core.BasisSet.build(mymol, "DF_BASIS_SCF", "", "RIFIT", psi4.core.get_global_option('BASIS'))
 aux2    = psi4.core.BasisSet.build(mymol, "DF_BASIS_MP2", "", "JKFIT", psi4.core.get_global_option('BASIS'))
 

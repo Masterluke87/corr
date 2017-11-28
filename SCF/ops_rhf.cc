@@ -32,28 +32,23 @@ extern void symmortho_mat(int nroao, double *mat, double* tmat, double* dummat);
 extern void transform_MOs(int nroao, double *MOs, double* tmat, double* tmpvec);
 
 
-void calculate_libint_oei(double* coord,double* charges,std::string basisName,int nroa,
+void calculate_libint_oei(std::vector<libint2::Atom> &atoms,libint2::BasisSet &obs,double* zeff,
 	double* Hmat       ,double* Tmat       ,double* Smat       ,double* Vmat,
 	double* Hmat_libint,double* Tmat_libint,double* Smat_libint,double* Vmat_libint,
 	double* Hmat_trans ,double* Tmat_trans ,double* Smat_trans ,double* Vmat_trans)
 {
-	std::cout << "Starting libint2 - part" << '\n';
-	libint2::initialize();
-  std::vector<libint2::Atom> atoms(nroa);
-  for (size_t i = 0; i < nroa; i++) {
-    atoms[i].atomic_number = charges[i];
-    atoms[i].x = coord[i*3+0];
-    atoms[i].y = coord[i*3+1];
-    atoms[i].z = coord[i*3+2];
-  }
 
-	libint2::BasisSet obs(basisName,atoms);
-	obs.set_pure(true);
+
 
 	libint2::Engine s_engine(libint2::Operator::overlap,obs.max_nprim(),obs.max_l());
 	libint2::Engine t_engine(libint2::Operator::kinetic,obs.max_nprim(),obs.max_l());
 	libint2::Engine v_engine(libint2::Operator::nuclear,obs.max_nprim(),obs.max_l());
-	v_engine.set_params(make_point_charges(atoms));
+
+	std::vector<std::pair<double, std::array<double, 3>>> q(atoms.size());
+	for (size_t i = 0; i < atoms.size(); i++) {
+		q.push_back({zeff[i],{{atoms[i].x,atoms[i].y,atoms[i].z}}});
+	}
+	v_engine.set_params(q);
 
 	int nroao = obs.nbf();
 
@@ -125,6 +120,14 @@ void calculate_libint_oei(double* coord,double* charges,std::string basisName,in
 				two_shift = {+8,+5,+2,-1,-4,-4,-3,-2,-1};
         two_size  = 9;
 			}
+			if (obs[s1].contr[0].l == 5) {
+				one_shift = {+10,+7,+4,+1,-2,-5,-5,-4,-3,-2,-1};
+        one_size  = 11;
+			}
+			if (obs[s2].contr[0].l == 5) {
+				two_shift = {+10,+7,+4,+1,-2,-5,-5,-4,-3,-2,-1};
+        two_size  = 11;
+			}
 			// integrals are packed into ints_shellset in row-major (C) form
 			// this iterates over integrals in this order
 			for(auto f1=0; f1!=n1; ++f1)
@@ -185,13 +188,13 @@ void calculate_libint_oei(double* coord,double* charges,std::string basisName,in
 	std::cout << "vmatmax :" <<vmatmax << '\n';
 	std::cout << "hmatmax :" <<hmatmax << '\n';
 
-  if (smatmax < 1E-10 && tmatmax<1E-10 && hmatmax<1E-10 && vmatmax<1E-10){
+  if (smatmax < 1E-10 && tmatmax<1E-10 && vmatmax<1E-10){
     std::cout << "It seems the transformation worked" << '\n';
   }
 
 
 
-	libint2::finalize();
+
 }
 
 
@@ -552,4 +555,268 @@ double   calc_op_1el(int nroao, double* opmat, double* Pmat){
     }
   }
   return(op);
+}
+
+
+void calculate_libint_tei(std::vector<libint2::Atom> &atoms,libint2::BasisSet &obs,
+	long long int &nrofint,double** intval,unsigned short** intnums,long long int * sortcount)
+	{
+		libint2::Engine eri_engine(libint2::Operator::coulomb,obs.max_nprim(),obs.max_l());
+		auto shell2bf = obs.shell2bf();
+		const auto& buf_vec_eri = eri_engine.results();
+		long long int count = 0;
+		double integral = 0.0;
+
+    for(auto s2=0; s2!=obs.size(); ++s2)
+		 	for(auto s1=s2; s1!=obs.size(); ++s1)
+					for(auto s4=0; s4!=obs.size(); ++s4)
+						for(auto s3=s4; s3!=obs.size(); ++s3)  {
+						eri_engine.compute(obs[s1], obs[s2], obs[s3], obs[s4]);
+						auto ints_shellset_eri = buf_vec_eri[0];
+
+						if (ints_shellset_eri!=NULL){
+
+						auto bf1 = shell2bf[s1]; // first basis function in first shell
+						auto n1 = obs[s1].size(); // number of basis functions in first shell
+						auto bf2 = shell2bf[s2]; // first basis function in second shell
+						auto n2 = obs[s2].size(); // number of basis functions in second shell
+						auto bf3 = shell2bf[s3]; // first basis function in first shell
+						auto n3 = obs[s3].size(); // number of basis functions in first shell
+						auto bf4 = shell2bf[s4]; // first basis function in second shell
+						auto n4 = obs[s4].size(); // number of basis functions in second shell
+
+						for(auto f1=0; f1!=n1; ++f1)
+							for(auto f2=0; f2!=n2; ++f2)
+								for(auto f3=0; f3!=n3; ++f3)
+									for(auto f4=0; f4!=n4; ++f4) {
+										//Tmat_libint[(bf1+f1)*obs.nbf() + (bf2+f2)] = ints_shellset_t[f1*n2+f2]
+										integral = ints_shellset_eri[f1*n2*n3*n4+f2*n3*n4+f3*n4+f4];
+										if (((bf1+f1) >= (bf2+f2)) && ((bf3+f3) >= (bf4+f4)) && (((bf1+f1)*(bf1+f1+1)/2 +(bf2+f2))>=((bf3+f3)*(bf3+f3+1)/2+(bf4+f4))))
+										{
+											if (std::fabs(integral)>1E-12)
+											count++;
+										}
+									}
+								}
+					}
+		nrofint       = count;
+		*intval        = new double[count];                   //two electron integrals
+		*intnums       = new unsigned short[count*4];         //two electron indices
+		count=0;
+
+		for(auto s2=0; s2!=obs.size(); ++s2)
+		 	for(auto s1=s2; s1!=obs.size(); ++s1)
+					for(auto s4=0; s4!=obs.size(); ++s4)
+						for(auto s3=s4; s3!=obs.size(); ++s3)  {
+						eri_engine.compute(obs[s1], obs[s2], obs[s3], obs[s4]);
+						auto ints_shellset_eri = buf_vec_eri[0];
+
+						auto bf1 = shell2bf[s1]; // first basis function in first shell
+						auto n1 = obs[s1].size(); // number of basis functions in first shell
+						auto bf2 = shell2bf[s2]; // first basis function in second shell
+						auto n2 = obs[s2].size(); // number of basis functions in second shell
+						auto bf3 = shell2bf[s3]; // first basis function in first shell
+						auto n3 = obs[s3].size(); // number of basis functions in first shell
+						auto bf4 = shell2bf[s4]; // first basis function in second shell
+						auto n4 = obs[s4].size(); // number of basis functions in second shell
+						if (ints_shellset_eri!=NULL){
+
+						for(auto f1=0; f1!=n1; ++f1)
+							for(auto f2=0; f2!=n2; ++f2)
+								for(auto f3=0; f3!=n3; ++f3)
+									for(auto f4=0; f4!=n4; ++f4) {
+										//Tmat_libint[(bf1+f1)*obs.nbf() + (bf2+f2)] = ints_shellset_t[f1*n2+f2]
+										integral = ints_shellset_eri[f1*n2*n3*n4+f2*n3*n4+f3*n4+f4];
+										if (((bf1+f1) >= (bf2+f2)) && ((bf3+f3) >= (bf4+f4)) && (((bf1+f1)*(bf1+f1+1)/2 +(bf2+f2))>=((bf3+f3)*(bf3+f3+1)/2+(bf4+f4))))
+										{
+											if (std::fabs(integral)>1E-12){
+												(*intval)[count] = integral;
+												(*intnums)[count*4+0] = bf1+f1;
+												(*intnums)[count*4+1] = bf2+f2;
+												(*intnums)[count*4+2] = bf3+f3;
+												(*intnums)[count*4+3] = bf4+f4;
+												count++;
+										}
+										}
+									}
+								}
+					}
+					resort_integrals(*intnums,*intval,count,sortcount);
+	}
+
+
+inline void swap_ints(long long int a, long long int b, double* intvals, unsigned short* intnums){
+	//temp = a
+	unsigned short ta = intnums[a*4+0];
+	unsigned short tb = intnums[a*4+1];
+	unsigned short tc = intnums[a*4+2];
+	unsigned short td = intnums[a*4+3];
+	double tval = intvals[a];
+
+	//a = b
+	intnums[a*4+0] =   intnums[b*4+0];
+	intnums[a*4+1] =   intnums[b*4+1];
+	intnums[a*4+2] =   intnums[b*4+2];
+	intnums[a*4+3] =   intnums[b*4+3];
+	intvals[a]     =   intvals[b];
+
+	//b = temp
+	intnums[b*4+0] =    ta;
+	intnums[b*4+1] =    tb;
+	intnums[b*4+2] =    tc;
+	intnums[b*4+3] =    td;
+	intvals[b]     =    tval;
+
+}
+
+void resort_integrals(unsigned short int*  intnums, double* intval,  long long int nrofint, long long int* sortcount ){
+	//RESORT INTEGRALS
+
+	//STEP 1: BRING to basis types
+	for(long long int x = 0; x < nrofint; x++) {
+		unsigned short a,b,c,d;
+
+		//INPUT AUCH  CHEMIKER ??
+		a      = intnums[x*4+0];//a
+		b      = intnums[x*4+1];//b
+		c      = intnums[x*4+2];//c
+		d      = intnums[x*4+3];//d
+
+		//TYP IIb: reorder to IIa
+		if(a==b && b==d && c!=d) {
+			intnums[x*4+0] = a; //a
+			intnums[x*4+1] = a; //b
+			intnums[x*4+2] = a; //c
+			intnums[x*4+3] = c; //d
+		}
+
+		//TYP IIc: reorder to IIa
+		if(a!=b && a==c && c==d) {
+			intnums[x*4+0] = a; //a
+			intnums[x*4+1] = a; //b
+			intnums[x*4+2] = a; //c
+			intnums[x*4+3] = b; //d
+		}
+
+		//TYP IId: reorder to IIa
+		if(a!=b && b==c && c==d) {
+			intnums[x*4+0] = b; //a
+			intnums[x*4+1] = b; //b
+			intnums[x*4+2] = b; //c
+			intnums[x*4+3] = a; //d
+		}
+
+		//TYP IIIc: reorder to IIIb
+		if(a==d && b==c && a!=b) {
+			intnums[x*4+0] = a; //a
+			intnums[x*4+1] = b; //b
+			intnums[x*4+2] = d; //c
+			intnums[x*4+3] = c; //d
+		}
+
+
+		//TYP IVc:  reorder IVb
+		if(b==c && b!=a && b!=d && a!=d) {
+			intnums[x*4+0] = b; //a
+			intnums[x*4+1] = a; //b
+			intnums[x*4+2] = c; //c
+			intnums[x*4+3] = d; //d
+		}
+
+		//TYP IVd:  reorder to IVa
+		if(c==d && c!=a && c!=b && a!=b) {
+			intnums[x*4+0] = c; //a
+			intnums[x*4+1] = c; //b
+			intnums[x*4+2] = a; //c
+			intnums[x*4+3] = b; //d
+		}
+
+		//TYP IVe:  reorder IVb
+		if(a==d && a!=b && a!=c && b!=c) {
+			intnums[x*4+0] = a; //a
+			intnums[x*4+1] = b; //b
+			intnums[x*4+2] = d; //c
+			intnums[x*4+3] = c; //d
+		}
+		//TYP IVf: perm_all,  reorder IVb
+		if(b==d && b!=a && b!=c && a!=c) {
+			intnums[x*4+0] = b; //a
+			intnums[x*4+1] = a; //b
+			intnums[x*4+2] = d; //c
+			intnums[x*4+3] = c; //d
+		}
+	}
+
+	//STEP2: BRING PERM1 to front
+	long long int sorted = 0;
+	for(long long int x = 0; x < nrofint; x++) {
+		unsigned short a,b,c,d;
+
+		//INPUT AUCH  CHEMIKER ??
+		a      = intnums[x*4+0];//a
+		b      = intnums[x*4+1];//b
+		c      = intnums[x*4+2];//c
+		d      = intnums[x*4+3];//d
+		if(a==b && b==c && c==d) {
+			swap_ints(x, sorted,  intval,  intnums);
+			sorted++;
+		}
+	}
+	std::cout << sorted << " integrals after search for perm_1\n";
+	sortcount[0] = sorted;
+	//STEP3: BRING PERM1_5 thereafter
+
+	for(long long int x = sorted; x < nrofint; x++) {
+		unsigned short a,b,c,d;
+
+		//INPUT AUCH  CHEMIKER ??
+		a      = intnums[x*4+0];//a
+		b      = intnums[x*4+1];//b
+		c      = intnums[x*4+2];//c
+		d      = intnums[x*4+3];//d
+		if(a==b && c==d) {
+			swap_ints(x, sorted,  intval,  intnums);
+			sorted++;
+		}
+	}
+	std::cout << sorted << " integrals after search for perm_15\n";
+	sortcount[1] = sorted;
+
+
+	//STEP4: BRING PERM1234
+	for(int x = sorted; x < nrofint; x++) {
+		int a,b,c,d;
+
+		//INPUT AUCH  CHEMIKER ??
+		a      = intnums[x*4+0];//a
+		b      = intnums[x*4+1];//b
+		c      = intnums[x*4+2];//c
+		d      = intnums[x*4+3];//d
+		if(a==c && b==d) {
+			swap_ints(x, sorted,  intval,  intnums);
+			sorted++;
+		}
+	}
+	std::cout << sorted << " integrals after search for perm_1234\n";
+	sortcount[2] = sorted;
+
+	//STEP5: BRING PERM1256
+	for(int x = sorted; x < nrofint; x++) {
+		int a,b,c,d;
+
+		//INPUT AUCH  CHEMIKER ??
+		a      = intnums[x*4+0];//a
+		b      = intnums[x*4+1];//b
+		c      = intnums[x*4+2];//c
+		d      = intnums[x*4+3];//d
+		if(a==b) {
+			swap_ints(x, sorted,  intval,  intnums);
+			sorted++;
+		}
+	}
+	std::cout << sorted << " integrals after search for perm_1256\n";
+	sortcount[3] = sorted;
+	std::cout << nrofint << " integrals in total\n";
+	std::cout << "-------------------------------------------------------------------------------\n";
+
 }
