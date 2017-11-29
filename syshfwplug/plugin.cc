@@ -36,154 +36,54 @@
 #include "psi4/libqt/qt.h"
 #include "psi4/lib3index/dftensor.h"
 #include <fstream>
+#include <iomanip>
 
 void resort_integrals(unsigned short int*  intnums, double* intval,  long long int nrofint, long long int* sortcount );
+
+void print_header(){
+	std::cout << "++++++++++++++++++++++ " << '\n';
+	std::cout << "+SYSHFWPLUG - plugin + " << '\n';
+	std::cout << "++++++++++++++++++++++ " << '\n';
+}
+
+
+
+
 
 
 namespace psi {
 
 namespace syshfwplug  {
 
-extern "C"
-int read_options(std::string name, Options &options)
-{
-	if (name == "SYSHFWPLUG"|| options.read_globals()) {
-		/*- The amount of information printed
-		    to the output file -*/
-		options.add_int("PRINT", 1);
-		/*- Whether to compute two-electron integrals -*/
-		options.add_bool("DO_TEI", true);
-		options.add_bool("DRYRUN", false);
-		options.add_bool("BUILD_RIJK ", false);
-		options.add_bool("BUILD_RIMP2", false);
-		options.add_str("PREF","vergessen-wa");
+void run_dryrun(SharedWavefunction ref_wfn, bool do_tei, bool do_rijk, bool do_rimp2){
+	std::cout << "\nDRYRUN!:" << '\n';
+	std::cout << "--------"<<"\n";
 
-	}
+	auto molecule = ref_wfn->molecule();
+	auto aoBasis  = ref_wfn->basisset();
+	auto aux      = ref_wfn->get_basisset("JKFIT");
+	auto aux2     = ref_wfn->get_basisset("RIFIT");
 
-	return true;
-}
-
-extern "C"
-SharedMatrix syshfwplug(SharedWavefunction ref_wfn, Options &options)
-{
-	// Grab options from the options object
-	int print = options.get_int("PRINT");
-	int doTei = options.get_bool("DO_TEI");
-	std::string pref = options.get_str("PREF");
-	bool dryrun = options.get_bool("DRYRUN");
-
-	std::cout << "Prefix " << pref << "\n";
-	std::cout << "Write sys " << doTei << "\n";
-
-	std::string sysfn = pref + ".sys";
-	std::string hfawfn = pref + ".ahfw";
-	std::string hfbwfn = pref + ".bhfw";
+	int nbf   = aoBasis->nbf();
+	int naux  = aux->nbf();
+	int naux2 = aux2->nbf();
 
 
-
-	std::shared_ptr<Molecule> molecule = ref_wfn->molecule();
-
-	// Form basis object:
-	std::shared_ptr<BasisSet> aoBasis = ref_wfn->basisset();
-
-	// The integral factory oversees the creation of integral objects
-	std::shared_ptr<IntegralFactory> integral(new IntegralFactory(aoBasis, aoBasis, aoBasis, aoBasis));
-
-	// N.B. This should be called after the basis has been built, because the geometry has not been
-	// fully initialized until this time.
-
-	//shared_ptr<Vector3> bal = molecule->xyz(0); ;
-	//    bal = molecule->xyz(0);
+	std::cout << "NBFS" << '\n';
+	std::cout << "AO    :" <<nbf<< '\n';
+	std::cout << "RIJK  :" <<naux<< '\n';
+	std::cout << "RIMP2 :" <<naux2<< '\n';
 
 
-	const double cutoff2el = 1.e-12;
+	if (do_tei) {
 
-	molecule->print();
-	std::cout << "Nr of atoms " <<  molecule->natom() << "\n";
-	std::shared_ptr<Matrix> coord (new Matrix(molecule->geometry()));
+		std::shared_ptr<IntegralFactory> integral(new IntegralFactory(aoBasis, aoBasis, aoBasis, aoBasis));
+		const double cutoff2el = 1.e-12;
+		long long int count=0;
 
-
-	std::cout << "DEBUG";
-	// Build a dimension object with a single dim since this is AO's
-
-	int nbf = aoBasis->nbf();
-
-	double nucrep = molecule->nuclear_repulsion_energy();
-	outfile->Printf("\n    Nuclear repulsion energy: %16.8f\n\n", nucrep);
-
-	// The matrix factory can create matrices of the correct dimensions...
-	std::shared_ptr<MatrixFactory> factory(new MatrixFactory);
-	factory->init_with(1, &nbf, &nbf);
-
-	// Form the one-electron integral objects from the integral factory
-	std::shared_ptr<OneBodyAOInt> sOBI(integral->ao_overlap());
-	std::shared_ptr<OneBodyAOInt> tOBI(integral->ao_kinetic());
-	std::shared_ptr<OneBodyAOInt> vOBI(integral->ao_potential());
-	std::shared_ptr<OneBodyAOInt> ecpOBI(integral->ao_ecp());
-	std::shared_ptr<OneBodyAOInt> dip(integral->ao_dipole());
-
-	// Form the one-electron integral matrices from the matrix factory
-	std::shared_ptr<Matrix> sMat(factory->create_matrix("Overlap"));
-	std::shared_ptr<Matrix> tMat(factory->create_matrix("Kinetic"));
-	std::shared_ptr<Matrix> vMat(factory->create_matrix("Potential"));
-	std::shared_ptr<Matrix> hMat(factory->create_matrix("One Electron Ints"));
-	std::shared_ptr<Matrix> ecpMat(factory->create_matrix("EPC Matrix "));
-
-
-
-	std::vector<SharedMatrix> dipole;
-	dipole.push_back(SharedMatrix(new Matrix("AO Mux", aoBasis->nbf(), aoBasis->nbf())));
-	dipole.push_back(SharedMatrix(new Matrix("AO Muy", aoBasis->nbf(), aoBasis->nbf())));
-	dipole.push_back(SharedMatrix(new Matrix("AO Muz", aoBasis->nbf(), aoBasis->nbf())));
-
-	dip->compute(dipole);
-
-	// Compute the one electron integrals, telling each object where to store the result
-
-
-	// Form h = T + V by first cloning T and then adding V
-
-	hMat->copy(tMat);
-	hMat->add(vMat);
-	hMat->add(ecpMat);
-
-
-	sOBI->compute(sMat);
-	std::shared_ptr<Matrix> Calpha;
-	std::shared_ptr<Matrix> Cbeta;
-	//Coeff.
-	if (ref_wfn->reference_energy() != 0.0)
-	{
-		Calpha = ref_wfn->Ca();   //last index over MOS!!!!!!
-		Cbeta  = ref_wfn->Cb();
-		hMat   = ref_wfn->H();
-	}
-	else
-	{
-		Calpha = std::make_shared<Matrix>(aoBasis->nbf(),aoBasis->nbf());
-		Cbeta  = std::make_shared<Matrix>(aoBasis->nbf(),aoBasis->nbf());
-
-		if (dryrun==false) {
-			tOBI->compute(tMat);
-			vOBI->compute(vMat);
-			ecpOBI->compute(ecpMat);
-			hMat->copy(tMat);
-			hMat->add(vMat);
-			hMat->add(ecpMat);
-		}
-
-	}
-
-
-	long long int count=0;
-
-	// Now, the two-electron integrals
-	std::shared_ptr<TwoBodyAOInt> eri(integral->eri());
-	// The buffer will hold the integrals for each shell, as they're computed
-	const double *buffer = eri->buffer();
-	// The iterator conveniently lets us iterate over functions within shells
-	AOShellCombinationsIterator shellIter = integral->shells_iterator();
-	if(doTei) {
+		std::shared_ptr<TwoBodyAOInt> eri(integral->eri());
+		const double *buffer = eri->buffer();
+		AOShellCombinationsIterator shellIter = integral->shells_iterator();
 		for (shellIter.first(); shellIter.is_done() == false; shellIter.next()) {
 			// Compute quartet
 			eri->compute_shell(shellIter);
@@ -196,267 +96,261 @@ SharedMatrix syshfwplug(SharedWavefunction ref_wfn, Options &options)
 				int s = intIter.l();
 				if( fabs(buffer[intIter.index()]) > cutoff2el) {
 					++count;
-				}
-			}
-		}
-	}
-
-	long long int nrofint = count;       //nr of nonzero to electron integrals
-	long long int sortcount[4];  //boundaries for different permutation patterns;
-	int nroao = aoBasis->nbf();
-	int nroa  = molecule->natom();
-	int nroe  = ref_wfn->nalpha() + ref_wfn->nbeta();
-
-	double*              intval;        //two electron integrals
-	unsigned short int*  intnums;       //two electron indecies
-	double*              Coord;         //atomic ccordinates
-	double*              charges;       //atomic charges  (all set to the same value so far)
-	double*              mass;          //atomic masses
-	double*              hmat;          //one electron hamiltonian
-	double*              kmat;          //kinetic energy
-	double*              smat;          //overlapp
-	double*              Dx;            //dipole x
-	double*              Dy;            //dipole y
-	double*              Dz;            //dipole z
-
-	double* MOensA;   //nroao
-	double* MOensB;   //nroao
-	double* MOsA;     //nroao*nroao
-	double* MOsB;     //nroao*nroao
-
-	int aointl = nroao*nroao*8+nroa*5+2*nroao;
-	std::cout << "Need " <<  aointl*8 <<   " Bytes  for one el ints, coords, and charges and MOs.\n";
-	std::cout << "Need " <<  nrofint*8 <<  " Bytes  for two el indices and the same for two el values.\n";
-	std::cout<<"\nORBBAS\nSieve: "<<nrofint*8<<" bytes\n"<<"Total: "<<(long long int) nbf*nbf*nbf*nbf*8<<" bytes \n\n";
-
-
-	if (dryrun == false)
-	{
-		double* dumd = new double[aointl+1024];
-		int incre = 0;
-		Coord   = &(dumd[incre]); incre += 3*nroa;
-		charges = &(dumd[incre]); incre +=   nroa;
-		mass    = &(dumd[incre]); incre +=   nroa;
-		hmat    = &(dumd[incre]); incre += nroao*nroao;
-		kmat    = &(dumd[incre]); incre += nroao*nroao;
-		smat    = &(dumd[incre]); incre += nroao*nroao;
-		Dx      = &(dumd[incre]); incre += nroao*nroao;
-		Dy      = &(dumd[incre]); incre += nroao*nroao;
-		Dz      = &(dumd[incre]); incre += nroao*nroao;
-
-		MOensA  =  &(dumd[incre]); incre += nroao;
-		MOensB  =  &(dumd[incre]); incre += nroao;
-		MOsA   = &(dumd[incre]); incre += nroao*nroao;
-		MOsB   = &(dumd[incre]); incre += nroao*nroao;
-
-		intval = new double[nrofint];
-		intnums = new unsigned short[nrofint*4+4];
-		for (int j=0; j<molecule->natom(); j++) {
-			charges[j] = molecule->Z(j);
-			mass[j]    = molecule->mass(j);
-			for (int i=0; i<3; i++) {
-				Coord[3*j+i] = coord->get(j,i);
-			}
-		}
-
-		for(int x = 0; x < nroao; x++) {
-			for(int y = 0; y < nroao; y++) {
-				hmat[x*nroao+y] = hMat->get(x,y);
-				kmat[x*nroao+y] = tMat->get(x,y);
-				smat[x*nroao+y] = sMat->get(x,y);
-				Dx[x*nroao+y] = -dipole[0]->get(x,y);
-				Dy[x*nroao+y] = -dipole[1]->get(x,y);
-				Dz[x*nroao+y] = -dipole[2]->get(x,y);
-			}
-		}
-
-
-
-		if(doTei) {
-			count = 0;
-			for (shellIter.first(); shellIter.is_done() == false; shellIter.next()) {
-				// Compute quartet
-				eri->compute_shell(shellIter);
-				// From the quartet get all the integrals
-				AOIntegralsIterator intIter = shellIter.integrals_iterator();
-				for (intIter.first(); intIter.is_done() == false; intIter.next()) {
-					int p = intIter.i();
-					int q = intIter.j();
-					int r = intIter.k();
-					int s = intIter.l();
-					if( fabs(buffer[intIter.index()]) > cutoff2el) {
-						//	  outfile->Printf("\t(%2d %2d | %2d %2d) = %20.15f\n",
-						//			  p, q, r, s, buffer[intIter.index()]);
-						intval[count] = buffer[intIter.index()];
-						intnums[4*count+0] = p;
-						intnums[4*count+1] = q;
-						intnums[4*count+2] = r;
-						intnums[4*count+3] = s;
-						++count;
+					if (count%(long long int)1.25E8 == 0) {
+						std::cout<<count/(long long int)1.25E8<<'\t'<<std::flush;
 					}
 				}
 			}
-			resort_integrals(intnums, intval,  nrofint, sortcount);
 		}
-		std::ofstream datf;
+		std::cout<<"\nORBBAS\nSieve: "<<count*8<<" bytes\n"<<"Total: "<<(long long int) nbf*nbf*nbf*nbf*8<<" bytes";
+		std::cout<<"\nSieve: "<<count/1024/1024/1024*8<<" GB \n"<<"Total: "<<(long long int) nbf*nbf*nbf*nbf*8/1024/1024/1024<<" GB \n\n";
+	}
 
-		if(doTei) {
-			datf.open(sysfn);
+	if (do_rijk) {
+		const double cutoff2el = 1.e-12;
+		long long int count=0;
+		auto zero = BasisSet::zero_ao_basis_set();
+		std::shared_ptr<IntegralFactory> fact(new IntegralFactory(aux,zero,aoBasis,aoBasis));
+		std::shared_ptr<TwoBodyAOInt> auxeri(fact->eri());
+		const double *buffer = auxeri->buffer();
+		count = 0;
+		for (int P = 0; P < aux->nshell(); P++) {
+			int np = aux->shell(P).nfunction();
+			int pstart = aux->shell(P).function_index();
+			for (int M = 0; M < aoBasis->nshell(); M++) {
+				int nm = aoBasis->shell(M).nfunction();
+				int mstart = aoBasis->shell(M).function_index();
+				for (int N = 0; N < aoBasis->nshell(); N++) {
+					int nn = aoBasis->shell(N).nfunction();
+					int nstart = aoBasis->shell(N).function_index();
 
-			std::clog << "Writing binary data to " <<  "plugin.sys" << "\n";
-
-			double coc[] = {0.,0.,0.};
-			double com[] = {0.,0.,0.};
-			double tc = 0.;
-			double tm = 0.;
-			for(int x = 0; x < nroa; x++) {
-				tc += charges[x];
-				tm += mass[x];
-				for(int y = 0; y < 3; y++) {
-					coc[y] += charges[x]*Coord[3*x+y];
-					com[y] += mass[x]*Coord[3*x+y];
+					auxeri->compute_shell(P,0,M,N);
+					for (int p = 0, index = 0; p < np; p++) {
+						for (int m = 0; m < nm; m++) {
+							for (int n = 0; n < nn; n++, index++) {
+								//Bp[p + pstart][(m + mstart) * nbf + (n + nstart)] = buffer[index];
+								if (fabs(buffer[index])  > cutoff2el) {
+									count++;
+									if (count%(long long int)1.25E8 == 0) {
+										std::cout<<count/(long long int)1.25E8<<'\t'<<std::flush;
+									}
+								}
+							}
+						}
+					}
 				}
 			}
-			for(int y = 0; y < 3; y++) {
-				coc[y] /= tc;
-				com[y] /= tm;
-			}
-
-			std::clog.precision(12);
-			std::clog << "Center of charge is " << coc[0] << " " << coc[1] << " " << coc[2] << "\n";
-			std::clog << "Center of mass   is " << com[0] << " " << com[1] << " " << com[2] << "\n";
-
-			//SYSTEM DATA
-			datf.write((char *) &nroe, sizeof(int));
-			datf.write((char *) &nroao, sizeof(int));
-			datf.write((char *) &nroa, sizeof(int));
-			datf.write((char *) &nrofint,  sizeof(long long int));
-			datf.write((char *) Coord, sizeof(double)*3*nroa);
-			datf.write((char *) charges, sizeof(double)*nroa);
-			datf.write((char *) mass,    sizeof(double)*nroa);
-
-			//ONEL EL INTEGRAL DATA
-			datf.write((char * ) hmat, sizeof(double)*nroao*nroao);
-			datf.write((char * ) kmat, sizeof(double)*nroao*nroao);
-			datf.write((char * ) smat, sizeof(double)*nroao*nroao);
-			datf.write((char * ) Dx, sizeof(double)*nroao*nroao);
-			datf.write((char * ) Dy, sizeof(double)*nroao*nroao);
-			datf.write((char * ) Dz, sizeof(double)*nroao*nroao);
-
-			//TWO EL INTEGRAL DATA
-			datf.write((char *) sortcount, sizeof(long long int)*4);
-			datf.write((char *) intval,    sizeof(double)*nrofint);
-			datf.write((char *) intnums,   sizeof(unsigned short)*nrofint*4);
-
-			datf.close();
 		}
+		std::cout<<"JKFIT\nSieve: "<<count*8<<" bytes\n"<<"Total: "<<(long long int)nbf*nbf*naux*8<<" bytes";
+		std::cout<<"\nSieve: "<<count*8/1024/1024/1024<<" GB\n"<<"Total: "<<(long long int)nbf*nbf*naux*8/1024/1024/1024<<" GB\n\n";
 
-		for(int x = 0; x < nroao; x++)
-			MOensA[x] = MOensB[x] = 0.;
+	}
 
-		for(int x = 0; x < nroao; x++) {
-			for(int y = 0; y < nroao; y++) {
-				MOsA[x*nroao+y] = Calpha->get(y,x);
-				MOsB[x*nroao+y] = Cbeta->get(y,x);
+	if (do_rimp2) {
+		const double cutoff2el = 1.e-12;
+		long long int count=0;
+		auto zero = BasisSet::zero_ao_basis_set();
+		std::shared_ptr<IntegralFactory> fact(new IntegralFactory(aux2,zero,aoBasis,aoBasis));
+		std::shared_ptr<TwoBodyAOInt> auxeri(fact->eri());
+		const double *buffer = auxeri->buffer();
+		count = 0;
+		for (int P = 0; P < aux2->nshell(); P++) {
+			int np = aux2->shell(P).nfunction();
+			int pstart = aux2->shell(P).function_index();
+			for (int M = 0; M < aoBasis->nshell(); M++) {
+				int nm = aoBasis->shell(M).nfunction();
+				int mstart = aoBasis->shell(M).function_index();
+				for (int N = 0; N < aoBasis->nshell(); N++) {
+					int nn = aoBasis->shell(N).nfunction();
+					int nstart = aoBasis->shell(N).function_index();
+
+					auxeri->compute_shell(P,0,M,N);
+					for (int p = 0, index = 0; p < np; p++) {
+						for (int m = 0; m < nm; m++) {
+							for (int n = 0; n < nn; n++, index++) {
+								//Bp[p + pstart][(m + mstart) * nbf + (n + nstart)] = buffer[index];
+								if (fabs(buffer[index])  > cutoff2el) {
+									count++;
+									if (count%(long long int)1.25E8 == 0) {
+										std::cout<<count/(long long int)1.25E8<<'\t'<<std::flush;
+									}
+								}
+							}
+						}
+					}
+				}
 			}
 		}
+		std::cout<<"RIMP2\nSieve: "<<count*8<<" bytes\n"<<"Total: "<<(long long int)nbf*nbf*naux2*8<<" bytes";
+		std::cout<<"\nSieve: "<<count*8/1024/1024/1024<<" GB\n"<<"Total: "<<(long long int)nbf*nbf*naux2*8/1024/1024/1024<<" GB\n\n";
+	}
+}
 
-		std::clog << "A " << MOsA[0] << " B " << MOsB[0] << "\n";
-		std::clog << "Writing MOs to " << hfawfn << " & " << hfbwfn << "\n";
-		datf.open(hfawfn);
-		datf.write((char *)  &nroao, sizeof(int));
-		datf.write((char * ) MOensA, sizeof(double)*nroao);
-		datf.write((char * ) MOsA, sizeof(double)*nroao*nroao);
-		datf.close();
-
-		datf.open(hfbwfn);
-		datf.write((char *)  &nroao, sizeof(int));
-		datf.write((char * ) MOensB, sizeof(double)*nroao);
-		datf.write((char * ) MOsB, sizeof(double)*nroao*nroao);
-		datf.close();
-
-		delete[] intval;
-		delete[] intnums;
-	} //end if dyrun
+void run_oei(SharedWavefunction ref_wfn, std::string pref){
+	std::cout << "\nONE-ELECTRON INTEGRALS" << '\n';
+	std::cout << "----------------------" << '\n';
 
 
+	auto molecule  = ref_wfn->molecule();
+	auto aoBasis   = ref_wfn->basisset();
+	int nbf = aoBasis->nbf();
 
 
+	std::shared_ptr<IntegralFactory> integral(new IntegralFactory(aoBasis, aoBasis, aoBasis, aoBasis));
+	std::shared_ptr<MatrixFactory> factory(new MatrixFactory);
+	factory->init_with(1, &nbf, &nbf);
 
-  std::cout<<"\n Starting JKFIT \n";
-	auto aux = ref_wfn->get_basisset("JKFIT");
+	std::shared_ptr<OneBodyAOInt> sOBI(integral->ao_overlap());
+	std::shared_ptr<OneBodyAOInt> tOBI(integral->ao_kinetic());
+	std::shared_ptr<OneBodyAOInt> vOBI(integral->ao_potential());
+	std::shared_ptr<OneBodyAOInt> ecpOBI(integral->ao_ecp());
+	std::shared_ptr<OneBodyAOInt> dip(integral->ao_dipole());
 
-	//calc Metric
-	std::shared_ptr<BasisSet> zero = BasisSet::zero_ao_basis_set();
-	std::shared_ptr<IntegralFactory> rifactory_J(new IntegralFactory(aux, zero, aux, zero));
-	int naux = aux->nbf();
-	std::cout<<"naux:"<<naux<<"\n";
-	std::shared_ptr<TwoBodyAOInt> Jint (rifactory_J->eri());
-	SharedMatrix AOmetric(new Matrix("AO Basis DF Metric", naux, naux));
-	double** W = AOmetric->pointer(0);
-	const double *Jbuffer = Jint->buffer();
-	for (int MU=0; MU < aux->nshell(); ++MU) {
-		int nummu = aux->shell(MU).nfunction();
-		for (int NU=0; NU <= MU; ++NU) {
-			int numnu = aux->shell(NU).nfunction();
-			Jint->compute_shell(MU, 0, NU, 0);
-			int index = 0;
-			for (int mu=0; mu < nummu; ++mu) {
-				int omu = aux->shell(MU).function_index() + mu;
-				for (int nu=0; nu < numnu; ++nu, ++index) {
-					int onu = aux->shell(NU).function_index() + nu;
-					W[omu][onu] = Jbuffer[index];
-					W[onu][omu] = Jbuffer[index];
+	std::shared_ptr<Matrix> sMat(factory->create_matrix("Overlap"));
+	std::shared_ptr<Matrix> tMat(factory->create_matrix("Kinetic"));
+	std::shared_ptr<Matrix> vMat(factory->create_matrix("Potential"));
+	std::shared_ptr<Matrix> hMat(factory->create_matrix("One Electron Ints"));
+	std::shared_ptr<Matrix> ecpMat(factory->create_matrix("EPC Matrix "));
+
+	sOBI->compute(sMat);
+
+	if (ref_wfn->reference_energy() != 0.0)
+	{
+		std::cout << "Reference Found!" << '\n';
+		hMat   = ref_wfn->H();
+		tOBI->compute(tMat);
+		vOBI->compute(vMat);
+	}
+	else
+	{
+		std::cout << "No Reference Found! Calculating the OEIs" << '\n';
+		tOBI->compute(tMat);
+		vOBI->compute(vMat);
+		ecpOBI->compute(ecpMat);
+		hMat->copy(tMat);
+		hMat->add(vMat);
+		hMat->add(ecpMat);
+	}
+
+	//prepare output
+	int nroao = nbf;
+
+	double* hmat = new double[nroao*nroao];
+	double* kmat = new double[nroao*nroao];
+	double* smat = new double[nroao*nroao];
+	double* vmat = new double[nroao*nroao];
+	for(int x = 0; x < nroao; x++) {
+		for(int y = 0; y < nroao; y++) {
+			hmat[x*nroao+y] = hMat->get(x,y);
+			kmat[x*nroao+y] = tMat->get(x,y);
+			smat[x*nroao+y] = sMat->get(x,y);
+			vmat[x*nroao+y] = vMat->get(x,y);
+		}
+	}
+
+	std::ofstream datf;
+	datf.open(pref+".oei");
+	datf.write((char * ) hmat, sizeof(double)*nroao*nroao);
+	datf.write((char * ) kmat, sizeof(double)*nroao*nroao);
+	datf.write((char * ) smat, sizeof(double)*nroao*nroao);
+	datf.write((char * ) vmat, sizeof(double)*nroao*nroao);
+	datf.close();
+	delete[] hmat;
+	delete[] kmat;
+	delete[] smat;
+	delete[] vmat;
+
+	std::cout << "OEI successfully exported" << '\n';
+}
+
+
+long long int run_tei(SharedWavefunction ref_wfn, std::string pref) {
+	std::cout << "\nTEI-ELECTRON INTEGRALS" << '\n';
+	std::cout << "----------------------" << '\n';
+
+	auto molecule = ref_wfn->molecule();
+	auto aoBasis  = ref_wfn->basisset();
+	const double cutoff2el = 1.e-12;
+	long long int count=0;
+
+	std::shared_ptr<IntegralFactory> integral(new IntegralFactory(aoBasis, aoBasis, aoBasis, aoBasis));
+
+
+	std::shared_ptr<TwoBodyAOInt> eri(integral->eri());
+	const double *buffer = eri->buffer();
+	AOShellCombinationsIterator shellIter = integral->shells_iterator();
+	for (shellIter.first(); shellIter.is_done() == false; shellIter.next()) {
+		// Compute quartet
+		eri->compute_shell(shellIter);
+		// From the quartet get all the integrals
+		AOIntegralsIterator intIter = shellIter.integrals_iterator();
+		for (intIter.first(); intIter.is_done() == false; intIter.next()) {
+			int p = intIter.i();
+			int q = intIter.j();
+			int r = intIter.k();
+			int s = intIter.l();
+			if( fabs(buffer[intIter.index()]) > cutoff2el) {
+				++count;
+				if (count%(long long int)1.25E8 == 0) {
+					std::cout<<count/(long long int)1.25E8<<'\t'<<std::flush;
 				}
 			}
 		}
 	}
-
-	SharedMatrix eigvec(new Matrix("eigvecs",naux,naux));
-	double** vecp = eigvec->pointer();
-
-	C_DCOPY(naux*(size_t)naux,W[0],1,vecp[0],1);
-	double tol = 1.0E-10;
-	double* eigval = new double[naux];
-	int lwork = naux * 3;
-	double* work = new double[lwork];
-	int stat = C_DSYEV('v','u',naux,vecp[0],naux,eigval,work,lwork);
-
-	SharedMatrix Jcopy(new Matrix("Jcopy", naux, naux));
-	double** Jcopyp = Jcopy->pointer();
-	C_DCOPY(naux*(size_t)naux,vecp[0],1,Jcopyp[0],1);
-
-	double max_J = eigval[naux-1];
-	int nsig = 0;
-	for (int ind=0; ind<naux; ind++) {
-		if (eigval[ind] / max_J < tol || eigval[ind] <= 0.0)
-			eigval[ind] = 0.0;
-		else {
-			nsig++;
-			eigval[ind] = 1.0 / sqrt(eigval[ind]);
+	long long int nrofint = count;
+	long long int sortcount[4] = {0, 0, 0, 0};
+	double* intval = new double[nrofint];
+	unsigned short* intnums = new unsigned short[nrofint*4+4];
+	count = 0;
+	for (shellIter.first(); shellIter.is_done() == false; shellIter.next()) {
+		// Compute quartet
+		eri->compute_shell(shellIter);
+		// From the quartet get all the integrals
+		AOIntegralsIterator intIter = shellIter.integrals_iterator();
+		for (intIter.first(); intIter.is_done() == false; intIter.next()) {
+			int p = intIter.i();
+			int q = intIter.j();
+			int r = intIter.k();
+			int s = intIter.l();
+			if( fabs(buffer[intIter.index()]) > cutoff2el) {
+				//	  outfile->Printf("\t(%2d %2d | %2d %2d) = %20.15f\n",
+				//			  p, q, r, s, buffer[intIter.index()]);
+				intval[count] = buffer[intIter.index()];
+				intnums[4*count+0] = p;
+				intnums[4*count+1] = q;
+				intnums[4*count+2] = r;
+				intnums[4*count+3] = s;
+				++count;
+			}
 		}
-		// scale one set of eigenvectors by the diagonal elements j^{-1/2}
-		C_DSCAL(naux, eigval[ind], vecp[ind], 1);
 	}
-	delete[] eigval;
-	C_DGEMM('T','N',naux,naux,naux,1.0,Jcopyp[0],naux,vecp[0],naux,0.0,W[0],naux);
+	resort_integrals(intnums, intval,  nrofint, sortcount);
+	std::ofstream datf;
+	datf.open(pref+".tei");
+	datf.write((char *) sortcount, sizeof(long long int)*4);
+	datf.write((char *) intval,    sizeof(double)*nrofint);
+	datf.write((char *) intnums,   sizeof(unsigned short)*nrofint*4);
+	datf.close();
 
-	std::cout<<"\n Metric JKFIT done \n";
-	//end metrix
+	std::cout << "TEI successfully written" << '\n';
+	return nrofint;
+}
 
 
-	//calc 3index integrals first round
-	//SharedMatrix B(new Matrix("Bso", naux, nbf * nbf));
-	//SharedMatrix A(new Matrix("Aso", naux, nbf * nbf));
-	//double** Ap = A->pointer();
-	//double** Bp = B->pointer();
-	//double** Jp = AOmetric->pointer();
+long long int run_rijk(SharedWavefunction ref_wfn, std::string pref){
+	std::cout << "\nRIJK INTEGRALS:" << '\n';
+	std::cout <<   "---------------"<<"\n";
 
-	zero = BasisSet::zero_ao_basis_set();
+	auto molecule = ref_wfn->molecule();
+	auto aoBasis  = ref_wfn->basisset();
+	auto aux      = ref_wfn->get_basisset("JKFIT");
+
+	const double cutoff2el = 1.e-12;
+	long long int count=0;
+	auto zero = BasisSet::zero_ao_basis_set();
 	std::shared_ptr<IntegralFactory> fact(new IntegralFactory(aux,zero,aoBasis,aoBasis));
 	std::shared_ptr<TwoBodyAOInt> auxeri(fact->eri());
-	buffer = auxeri->buffer();
-
+	const double *buffer = auxeri->buffer();
 	count = 0;
 	for (int P = 0; P < aux->nshell(); P++) {
 		int np = aux->shell(P).nfunction();
@@ -473,9 +367,9 @@ SharedMatrix syshfwplug(SharedWavefunction ref_wfn, Options &options)
 					for (int m = 0; m < nm; m++) {
 						for (int n = 0; n < nn; n++, index++) {
 							//Bp[p + pstart][(m + mstart) * nbf + (n + nstart)] = buffer[index];
-							if (buffer[index]  > cutoff2el){
+							if (fabs(buffer[index])  > cutoff2el) {
 								count++;
-								if (count%(long long int)1.25E8 == 0){
+								if (count%(long long int)1.25E8 == 0) {
 									std::cout<<count/(long long int)1.25E8<<'\t'<<std::flush;
 								}
 							}
@@ -485,76 +379,276 @@ SharedMatrix syshfwplug(SharedWavefunction ref_wfn, Options &options)
 			}
 		}
 	}
-	std::cout<<"JKFIT\nSieve: "<<count*8<<" bytes\n"<<"Total: "<<(long long int)nbf*nbf*naux*8<<" bytes \n\n";
-	std::cout<<"\nnbf:"<<nbf<<"\nnaux1:"<<naux;
-	//C_DGEMM('N','N',naux, nbf * nbf, naux, 1.0, W[0], naux, Bp[0], nbf * nbf, 0.0,
-	//        Ap[0], nbf * nbf);
 
-	// Build numpy and final matrix shape
+	std::cout<<"Export not yet implemented\n";
+	return count;
+}
 
 
-	std::vector<int> nshape{naux, naux};
-	AOmetric->set_numpy_shape(nshape);
-	return AOmetric;
+long long int run_rimp2(SharedWavefunction ref_wfn, std::string pref){
+	std::cout << "\nRIMP2 INTEGRALS:" << '\n';
+	std::cout <<   "---------------"<<"\n";
 
 
-	//auto aux2 = ref_wfn->get_basisset("RIFIT");
-	//std::clog<<aux2->nbf();
+	auto aoBasis  = ref_wfn->basisset();
+	auto aux2     = ref_wfn->get_basisset("RIFIT");
 
+	int nbf   = aoBasis->nbf();
+	int naux2 = aux2->nbf();
 
+	const double cutoff2el = 1.e-12;
+	long long int count=0;
+	auto zero = BasisSet::zero_ao_basis_set();
+	std::shared_ptr<IntegralFactory> fact(new IntegralFactory(aux2,zero,aoBasis,aoBasis));
+	std::shared_ptr<TwoBodyAOInt> auxeri(fact->eri());
+	const double *buffer = auxeri->buffer();
+	count = 0;
+	for (int P = 0; P < aux2->nshell(); P++) {
+		int np = aux2->shell(P).nfunction();
+		int pstart = aux2->shell(P).function_index();
+		for (int M = 0; M < aoBasis->nshell(); M++) {
+			int nm = aoBasis->shell(M).nfunction();
+			int mstart = aoBasis->shell(M).function_index();
+			for (int N = 0; N < aoBasis->nshell(); N++) {
+				int nn = aoBasis->shell(N).nfunction();
+				int nstart = aoBasis->shell(N).function_index();
 
-	//stolen from CDLK.cc
+				auxeri->compute_shell(P,0,M,N);
+				for (int p = 0, index = 0; p < np; p++) {
+					for (int m = 0; m < nm; m++) {
+						for (int n = 0; n < nn; n++, index++) {
+							//Bp[p + pstart][(m + mstart) * nbf + (n + nstart)] = buffer[index];
+							if (fabs(buffer[index])  > cutoff2el) {
+								count++;
+								if (count%(long long int)1.25E8 == 0) {
+									std::cout<<count/(long long int)1.25E8<<'\t'<<std::flush;
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
 
-	/*
-	   auto sieve = std::make_shared<ERISieve>(aoBasis, 0.0);
-	   long int ncholesky_;
-
-	   double cholesky_tolerance_ = 0.001;
-	   size_t memory_ = 500;
-
-	   std::clog<<"1";
-
-
-	   auto integral2 = std::make_shared<IntegralFactory>(aoBasis,aoBasis,aoBasis,aoBasis);
-
-	   auto Ch = std::make_shared<CholeskyERI>(std::shared_ptr<TwoBodyAOInt>(integral2->eri()),0.0,cholesky_tolerance_,memory_);
-	   std::clog<<"1.2";
-
-
-	   int ntri = sieve->function_pairs().size();
-	   std::clog<<"2";
-
-	   Ch->choleskify();
-	   std::clog<<"3";
-
-
-	   ncholesky_  = Ch->Q();
-	   size_t three_memory = ncholesky_ * ntri;
-	   int nbf_int = aoBasis->nbf();
-	   std::clog<<"2";
-
-	   std::shared_ptr<Matrix> L = Ch->L();
-	   double ** Lp = L->pointer();
-
-	   auto Qmn_ = std::make_shared<Matrix>("Qmn (CD Integrals)", ncholesky_ , ntri);
-	   double** Qmnp = Qmn_->pointer();
-
-	   const std::vector<long int>& schwarz_fun_pairs = sieve->function_pairs_reverse();
-
-	   for (size_t mu = 0; mu < nbf_int; mu++) {
-	    for (size_t nu = mu; nu < nbf_int; nu++) {
-	        if ( schwarz_fun_pairs[nu*(nu+1)/2+mu] < 0 ) continue;
-	        for (long int P = 0; P < ncholesky_; P++) {
-	            Qmnp[P][schwarz_fun_pairs[nu*(nu+1)/2+mu]] = Lp[P][mu * nbf_int + nu];
-	        }
-	    }
-	   }
-
-
-	 */
+	std::cout << "RIMP2 export not yet implemented" << '\n';
+	return count;
 
 
 
+}
+
+
+void run_export_mos(SharedWavefunction ref_wfn,std::string pref){
+	int nroao = ref_wfn->basisset()->nbf();
+	auto Calpha = std::make_shared<Matrix>(nroao,nroao);
+	auto Cbeta = std::make_shared<Matrix>(nroao,nroao);
+
+	Calpha->zero();
+	Cbeta->zero();
+
+	double* MOensA  = new double[nroao];   //nroao
+	double* MOensB  = new double[nroao];   //nroao
+	double* MOsA    = new double[nroao*nroao];   //nroao*nroao
+	double* MOsB    = new double[nroao*nroao]; //nroao*nroao
+
+	if (ref_wfn->reference_energy() != 0.0)
+	{
+		std::cout << "Reference Found!" << '\n';
+		Calpha = ref_wfn->Ca();
+		Cbeta  = ref_wfn->Cb();
+	}
+	//maybe later
+	for(int x = 0; x < nroao; x++)
+		MOensA[x] = MOensB[x] = 0.;
+
+	for(int x = 0; x < nroao; x++) {
+		for(int y = 0; y < nroao; y++) {
+			MOsA[x*nroao+y] = Calpha->get(y,x);
+			MOsB[x*nroao+y] = Cbeta->get(y,x);
+		}
+	}
+
+	std::ofstream datf;
+	datf.open(pref+".ahfw");
+	datf.write((char *)  &nroao, sizeof(int));
+	datf.write((char * ) MOensA, sizeof(double)*nroao);
+	datf.write((char * ) MOsA, sizeof(double)*nroao*nroao);
+	datf.close();
+	std::cout << "alpha Orbitals successfully exported" << '\n';
+
+	datf.open(pref+".bhfw");
+	datf.write((char *)  &nroao, sizeof(int));
+	datf.write((char * ) MOensB, sizeof(double)*nroao);
+	datf.write((char * ) MOsB, sizeof(double)*nroao*nroao);
+	datf.close();
+	std::cout << "beta Orbitals successfully exported" << '\n';
+	delete[] MOsA;
+	delete[] MOsB;
+	delete[] MOensA;
+	delete[] MOensB;
+}
+
+void run_export_sys(SharedWavefunction ref_wfn,std::string pref,
+										long long int nrofint,
+										long long int nrofaux,
+										long long int nrofaux2){
+	int nroe    = ref_wfn->nalpha() + ref_wfn->nbeta();
+	int nroao   = ref_wfn->basisset()->nbf();
+	int nroa  = ref_wfn->molecule()->natom();
+	int naux_1  = ref_wfn->get_basisset("JKFIT")->nbf();
+	int naux_2  = ref_wfn->get_basisset("RIFIT")->nbf();
+	auto molecule = ref_wfn->molecule();
+	std::shared_ptr<Matrix> coord (new Matrix(molecule->geometry()));
+	std::string basisNameOB = ref_wfn->basisset()->target();
+	std::string basisNameJK = ref_wfn->get_basisset("JKFIT")->target();
+	std::string basisNameRI = ref_wfn->get_basisset("RIFIT")->target();
+
+
+
+
+	basisNameOB.resize(32);
+	basisNameJK.resize(32);
+	basisNameRI.resize(32);
+
+
+
+	double* Coord   = new double[3*nroa];
+	int* mass       = new int[nroa];
+	double* charges = new double[nroa];
+	double* zeff    = new double[nroa];
+
+
+	for (int j=0; j<molecule->natom(); j++) {
+		charges[j] = molecule->charge(j);
+		zeff[j]    = molecule->Z(j);
+		mass[j]    = molecule->mass(j);
+		for (int i=0; i<3; i++) {
+			Coord[3*j+i] = coord->get(j,i);
+		}
+	}
+
+	std::cout << "\nSYSTEMDATA" << '\n';
+	std::cout << "----------" << "\n\n";
+	for (size_t i = 0; i < nroa; i++) {
+    std::cout<<std::setw(2)<<charges[i]<<std::setw(10)<<zeff[i]<< std::setw(10)<< Coord[i*3+0]<<std::setw(10) << Coord[i*3+1]<<std::setw(10)<< Coord[i*3+2]<<'\n';
+  }
+
+	std::cout << "nroe          :" << nroe<<'\n';
+	std::cout << "nroa          :" << nroa<<'\n';
+	std::cout << "nroao         :" << nroao<<'\n';
+	std::cout << "naux-JK       :" << naux_1<<'\n';
+	std::cout << "naux-RI       :" << naux_2<<'\n';
+	std::cout << "nrofint       :" << nrofint<<'\n';
+	std::cout << "nrofaux(JK)   :" << nrofaux<<'\n';
+	std::cout << "nrofaux(RI)   :" << nrofaux2<< '\n';
+	std::cout << "basisName(OB) :" << basisNameOB<<'\n';
+	std::cout << "basisName(JK) :" << basisNameJK<<'\n';
+	std::cout << "basisName(RI) :" << basisNameRI<<'\n';
+
+	std::ofstream datf;
+
+	datf.open(pref+".sys");
+	datf.write((char *) &nroe, sizeof(int));
+	datf.write((char *) &nroa, sizeof(int));
+	datf.write((char *) &nroao, sizeof(int));
+	datf.write((char *) &naux_1, sizeof(int));
+	datf.write((char *) &naux_2, sizeof(int));
+	datf.write((char *) &nrofint,   sizeof(long long int));
+	datf.write((char *) &nrofaux,   sizeof(long long int));
+	datf.write((char *) &nrofaux2,  sizeof(long long int));
+	datf.write((char *) Coord, sizeof(double)*3*nroa);
+	datf.write((char *) charges, sizeof(double)*nroa);
+	datf.write((char *) zeff, sizeof(double)*nroa);
+	datf.write((char *) mass,    sizeof(double)*nroa);
+	datf.write((char *) basisNameOB.c_str(),basisNameOB.size());
+	datf.write((char *) basisNameJK.c_str(),basisNameJK.size());
+	datf.write((char *) basisNameRI.c_str(),basisNameRI.size());
+	datf.close();
+	std::cout << "Systeminfo sucessfully written" << '\n';
+}
+
+extern "C"
+int read_options(std::string name, Options &options)
+{
+	if (name == "SYSHFWPLUG"|| options.read_globals()) {
+		/*- The amount of information printed
+		    to the output file -*/
+		options.add_int("PRINT", 1);
+		/*- Whether to compute two-electron integrals -*/
+		options.add_bool("DO_TEI", true);
+		options.add_bool("DO_OEI", true);
+		options.add_bool("DRYRUN", false);
+		options.add_bool("DO_RIJK", false);
+		options.add_bool("DO_RIMP2", false);
+		options.add_str("PREF","vergessen-wa");
+
+	}
+
+	return true;
+}
+
+extern "C"
+SharedWavefunction syshfwplug(SharedWavefunction ref_wfn, Options &options)
+{
+	// Grab options from the options object
+	int print         = options.get_int("PRINT");
+	std::string pref  = options.get_str("PREF");
+	bool dryrun       = options.get_bool("DRYRUN");
+	bool do_rijk      = options.get_bool("DO_RIJK");
+	bool do_rimp2     = options.get_bool("DO_RIMP2");
+	bool do_tei       = options.get_bool("DO_TEI");
+	bool do_oei       = options.get_bool("DO_OEI");
+
+	print_header();
+	std::cout << "Options:" << '\n';
+	std::cout << "--------" << '\n';
+	std::cout << "DO_OEI      :" <<do_oei<< '\n';
+	std::cout << "DO_TEI      :" <<do_tei<< '\n';
+	std::cout << "RIJK        :" <<do_rijk<< '\n';
+	std::cout << "RIMP2       :" <<do_rimp2<< '\n';
+	std::cout << "DRYRUN      :" <<dryrun<< '\n';
+	std::cout << "PREF        :" <<pref<< "\n\n";
+
+	std::cout << "E           :" <<ref_wfn->reference_energy()<< "\n";
+	std::cout << "max_am      :" <<ref_wfn->basisset()->max_am() << "\n";
+
+
+
+	if (dryrun)
+	{
+		run_dryrun(ref_wfn,do_tei,do_rijk,do_rimp2);
+		return ref_wfn;
+	}
+
+	std::cout << "\nPRODUCTIVE RUN:" << '\n';
+	std::cout << "---------------"<<"\n";
+
+	long long int nrofint  = 0;              //nr of nonzero to electron integrals
+	long long int nrofaux  = 0;              //nr of nonzero rijk integrals
+	long long int nrofaux2 = 0;              //nr of nonzero rimp2 integrals
+
+
+
+
+	if (do_oei) {
+		run_oei(ref_wfn,pref);
+	}
+
+	if (do_tei)
+	{
+		nrofint = run_tei(ref_wfn,pref);
+	}
+
+	if(do_rijk) {
+		nrofaux = run_rijk(ref_wfn,pref);
+	}
+	if(do_rimp2) {
+		nrofaux2 = run_rimp2(ref_wfn,pref);
+	}
+
+	run_export_mos(ref_wfn,pref);
+	run_export_sys(ref_wfn,pref,nrofint,nrofaux,nrofaux2);
 
 
 
@@ -570,7 +664,262 @@ SharedMatrix syshfwplug(SharedWavefunction ref_wfn, Options &options)
 
 
 
-	// Obtain the Wavefunction from globals that we set python-side
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*
+
+
+
+
+
+
+
+
+
+    if (dryrun == false)
+    {
+        double* dumd = new double[aointl+1024];
+        int incre = 0;
+        Coord   = &(dumd[incre]); incre += 3*nroa;
+        charges = &(dumd[incre]); incre +=   nroa;
+        mass    = &(dumd[incre]); incre +=   nroa;
+        hmat    = &(dumd[incre]); incre += nroao*nroao;
+        kmat    = &(dumd[incre]); incre += nroao*nroao;
+        smat    = &(dumd[incre]); incre += nroao*nroao;
+        Dx      = &(dumd[incre]); incre += nroao*nroao;
+        Dy      = &(dumd[incre]); incre += nroao*nroao;
+        Dz      = &(dumd[incre]); incre += nroao*nroao;
+
+        MOensA  =  &(dumd[incre]); incre += nroao;
+        MOensB  =  &(dumd[incre]); incre += nroao;
+        MOsA   = &(dumd[incre]); incre += nroao*nroao;
+        MOsB   = &(dumd[incre]); incre += nroao*nroao;
+
+
+        for (int j=0; j<molecule->natom(); j++) {
+            charges[j] = molecule->Z(j);
+            mass[j]    = molecule->mass(j);
+            for (int i=0; i<3; i++) {
+                Coord[3*j+i] = coord->get(j,i);
+            }
+        }
+
+
+
+
+
+        if(doTei) {
+            count = 0;
+            for (shellIter.first(); shellIter.is_done() == false; shellIter.next()) {
+                // Compute quartet
+                eri->compute_shell(shellIter);
+                // From the quartet get all the integrals
+                AOIntegralsIterator intIter = shellIter.integrals_iterator();
+                for (intIter.first(); intIter.is_done() == false; intIter.next()) {
+                    int p = intIter.i();
+                    int q = intIter.j();
+                    int r = intIter.k();
+                    int s = intIter.l();
+                    if( fabs(buffer[intIter.index()]) > cutoff2el) {
+                        //	  outfile->Printf("\t(%2d %2d | %2d %2d) = %20.15f\n",
+                        //			  p, q, r, s, buffer[intIter.index()]);
+                        intval[count] = buffer[intIter.index()];
+                        intnums[4*count+0] = p;
+                        intnums[4*count+1] = q;
+                        intnums[4*count+2] = r;
+                        intnums[4*count+3] = s;
+ ++count;
+                    }
+                }
+            }
+            resort_integrals(intnums, intval,  nrofint, sortcount);
+        }
+        std::ofstream datf;
+
+        if(doTei) {
+            datf.open(sysfn);
+
+            std::cout << "Writing binary data to " <<  "plugin.sys" << "\n";
+
+            double coc[] = {0.,0.,0.};
+            double com[] = {0.,0.,0.};
+            double tc = 0.;
+            double tm = 0.;
+            for(int x = 0; x < nroa; x++) {
+                tc += charges[x];
+                tm += mass[x];
+                for(int y = 0; y < 3; y++) {
+                    coc[y] += charges[x]*Coord[3*x+y];
+                    com[y] += mass[x]*Coord[3*x+y];
+                }
+            }
+            for(int y = 0; y < 3; y++) {
+                coc[y] /= tc;
+                com[y] /= tm;
+            }
+
+            std::cout.precision(12);
+            std::cout << "Center of charge is " << coc[0] << " " << coc[1] << " " << coc[2] << "\n";
+            std::cout << "Center of mass   is " << com[0] << " " << com[1] << " " << com[2] << "\n";
+
+            //SYSTEM DATA
+            datf.write((char *) &nroe, sizeof(int));
+            datf.write((char *) &nroao, sizeof(int));
+            datf.write((char *) &nroa, sizeof(int));
+            datf.write((char *) &nrofint,  sizeof(long long int));
+            datf.write((char *) basisName.c_str(), basisName.size());
+            datf.write((char *) Coord, sizeof(double)*3*nroa);
+            datf.write((char *) charges, sizeof(double)*nroa);
+            datf.write((char *) mass,    sizeof(double)*nroa);
+
+            //TWO EL INTEGRAL DATA
+            datf.write((char *) sortcount, sizeof(long long int)*4);
+            datf.write((char *) intval,    sizeof(double)*nrofint);
+            datf.write((char *) intnums,   sizeof(unsigned short)*nrofint*4);
+
+            datf.close();
+        }
+
+
+
+        delete[] intval;
+        delete[] intnums;
+    } //end if dyrun
+
+
+
+
+
+    std::clog<<"\n Starting JKFIT \n";
+    auto aux = ref_wfn->get_basisset("JKFIT");
+
+    //calc Metric
+    std::shared_ptr<BasisSet> zero = BasisSet::zero_ao_basis_set();
+    std::shared_ptr<IntegralFactory> rifactory_J(new IntegralFactory(aux, zero, aux, zero));
+    int naux = aux->nbf();
+    std::clog<<"naux:"<<naux<<"\n";
+    std::shared_ptr<TwoBodyAOInt> Jint (rifactory_J->eri());
+    SharedMatrix AOmetric(new Matrix("AO Basis DF Metric", naux, naux));
+    double** W = AOmetric->pointer(0);
+    const double *Jbuffer = Jint->buffer();
+    for (int MU=0; MU < aux->nshell(); ++MU) {
+        int nummu = aux->shell(MU).nfunction();
+        for (int NU=0; NU <= MU; ++NU) {
+            int numnu = aux->shell(NU).nfunction();
+            Jint->compute_shell(MU, 0, NU, 0);
+            int index = 0;
+            for (int mu=0; mu < nummu; ++mu) {
+                int omu = aux->shell(MU).function_index() + mu;
+                for (int nu=0; nu < numnu; ++nu, ++index) {
+                    int onu = aux->shell(NU).function_index() + nu;
+                    W[omu][onu] = Jbuffer[index];
+                    W[onu][omu] = Jbuffer[index];
+                }
+            }
+        }
+    }
+
+    SharedMatrix eigvec(new Matrix("eigvecs",naux,naux));
+    double** vecp = eigvec->pointer();
+
+    C_DCOPY(naux*(size_t)naux,W[0],1,vecp[0],1);
+    double tol = 1.0E-10;
+    double* eigval = new double[naux];
+    int lwork = naux * 3;
+    double* work = new double[lwork];
+    int stat = C_DSYEV('v','u',naux,vecp[0],naux,eigval,work,lwork);
+
+    SharedMatrix Jcopy(new Matrix("Jcopy", naux, naux));
+    double** Jcopyp = Jcopy->pointer();
+    C_DCOPY(naux*(size_t)naux,vecp[0],1,Jcopyp[0],1);
+
+    double max_J = eigval[naux-1];
+    int nsig = 0;
+    for (int ind=0; ind<naux; ind++) {
+        if (eigval[ind] / max_J < tol || eigval[ind] <= 0.0)
+            eigval[ind] = 0.0;
+        else {
+            nsig++;
+            eigval[ind] = 1.0 / sqrt(eigval[ind]);
+        }
+        // scale one set of eigenvectors by the diagonal elements j^{-1/2}
+        C_DSCAL(naux, eigval[ind], vecp[ind], 1);
+    }
+    delete[] eigval;
+    C_DGEMM('T','N',naux,naux,naux,1.0,Jcopyp[0],naux,vecp[0],naux,0.0,W[0],naux);
+
+    std::clog<<"\n Metric JKFIT done \n";
+    //end metrix
+
+
+    //calc 3index integrals first round
+    //SharedMatrix B(new Matrix("Bso", naux, nbf * nbf));
+    //SharedMatrix A(new Matrix("Aso", naux, nbf * nbf));
+    //double** Ap = A->pointer();
+    //double** Bp = B->pointer();
+    //double** Jp = AOmetric->pointer();
+
+    zero = BasisSet::zero_ao_basis_set();
+    std::shared_ptr<IntegralFactory> fact(new IntegralFactory(aux,zero,aoBasis,aoBasis));
+    std::shared_ptr<TwoBodyAOInt> auxeri(fact->eri());
+    buffer = auxeri->buffer();
+
+    count = 0;
+    for (int P = 0; P < aux->nshell(); P++) {
+        int np = aux->shell(P).nfunction();
+        int pstart = aux->shell(P).function_index();
+        for (int M = 0; M < aoBasis->nshell(); M++) {
+            int nm = aoBasis->shell(M).nfunction();
+            int mstart = aoBasis->shell(M).function_index();
+            for (int N = 0; N < aoBasis->nshell(); N++) {
+                int nn = aoBasis->shell(N).nfunction();
+                int nstart = aoBasis->shell(N).function_index();
+
+                auxeri->compute_shell(P,0,M,N);
+                for (int p = 0, index = 0; p < np; p++) {
+                    for (int m = 0; m < nm; m++) {
+                        for (int n = 0; n < nn; n++, index++) {
+                            //Bp[p + pstart][(m + mstart) * nbf + (n + nstart)] = buffer[index];
+                            if (buffer[index]  > cutoff2el) {
+                                count++;
+                                if (count%(long long int)1.25E8 == 0) {
+                                    std::cout<<count/(long long int)1.25E8<<'\t'<<std::flush;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    std::clog<<"JKFIT\nSieve: "<<count*8<<" bytes\n"<<"Total: "<<(long long int)nbf*nbf*naux*8<<" bytes \n\n";
+    std::clog<<"\nnbf:"<<nbf<<"\nnaux1:"<<naux;
+    //C_DGEMM('N','N',naux, nbf * nbf, naux, 1.0, W[0], naux, Bp[0], nbf * nbf, 0.0,
+    //        Ap[0], nbf * nbf);
+
+    // Build numpy and final matrix shape
+
+
+    std::vector<int> nshape{naux, naux};
+    AOmetric->set_numpy_shape(nshape);
+ */
+	return ref_wfn;
+
+
 }
 
 }

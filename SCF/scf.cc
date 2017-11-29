@@ -98,7 +98,7 @@ void run_scf(int nroao,int nroe, double* C, double* Pmat,double* Hmat,double* Fm
   double* MOens  = new double [nroao];
   double Escf  = 0.0;
   double DE    = 10.0;
-  double Eold  = 0.0;
+  double Eold  = 100.0;
   double damp  = 0.5;
   double start = 0.0;
   double end   = 0.0;
@@ -106,7 +106,7 @@ void run_scf(int nroao,int nroe, double* C, double* Pmat,double* Hmat,double* Fm
   build_Pmat(C,nroao,nroe,Pmat,0.0);
   std::cout<<std::fixed<<std::setprecision(10);
   std::cout<<std::setw(-4)<<"Iter"<<std::setw( 16 )<<"ESCF" << std::setw( 16 )<<"DE"<<std::setw( 16 )<<"t[s]"<<"\n";
-  while (iter  < maxiter && std::fabs(DE)>1E-8) {
+  while (iter  < maxiter && std::fabs(DE) > 1E-8) {
     start = omp_get_wtime();
     //with guess
     build_Pmat(C,nroao,nroe,Pmat,damp);
