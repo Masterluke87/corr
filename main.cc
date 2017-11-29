@@ -79,6 +79,13 @@ int main(int argc, char const *argv[]) {
 		std::cout << "basisName(RI) :" << basisNameRI<<'\n';
 	}
 
+	double scf_start;
+	double ints_start;
+
+	double scf_end;
+	double ints_end;
+
+
 
 	double* dumd;
 	//one electron mat&vecs
@@ -177,12 +184,14 @@ int main(int argc, char const *argv[]) {
 		                     Hmat,        Tmat, Smat, Vmat,
 		                     Hmat_libint, Tmat_libint, Smat_libint, Vmat_libint,
 		                     Hmat_trans, Tmat_trans, Smat_trans, Vmat_trans);
+		Smat = Smat_trans;
+		Hmat = Hmat_trans;
 
-		double start_ints = omp_get_wtime();
+		ints_start = omp_get_wtime();
 		calculate_libint_tei(atoms,obs,nrofint,&intval,&intnums,sortcount);
-		double end_ints = omp_get_wtime();
-		std::cout<<"Integral evaluation: "<<std::setw( 4 )<<end_ints - start_ints <<" [s]"<<"\n\n";
-		calc_S12(nroao, Smat_trans, Som12);
+		ints_end = omp_get_wtime();
+		std::cout<<"Integral evaluation: "<<std::setw( 4 )<<ints_start - ints_end <<" [s]"<<"\n\n";
+		calc_S12(nroao, Smat, Som12);
 		read_wav_HF(prefix+".ahfw",nroao,MOens,MOs);
 		{             //check if gd orbitals are provided;
 			double modiag=0.0;
@@ -192,15 +201,20 @@ int main(int argc, char const *argv[]) {
 			if (std::fabs(modiag) < 0.1) {
 				std::cout << "No converged MOs provided... doing core guess" << '\n';
 				for (int i =0; i<nroao*nroao; i++)
-					Fmat[i] = Hmat_trans[i];
+					Fmat[i] = Hmat[i];
 				double *tmpmat = new double[nroao*nroao];
 				diag_Fmat(nroao, Fmat,MOs,MOens,Som12, tmpmat);
 				delete[] tmpmat;
 			}
 		}
-		run_scf(nroao,nroe,MOs,Pmat,Hmat_trans,Fmat,intnums,intval,sortcount,nrofint,Som12,100,ion_rep);
+		scf_start = omp_get_wtime();
+		run_scf(nroao,nroe,MOs,Pmat,Hmat,Fmat,intnums,intval,sortcount,nrofint,Som12,100,ion_rep);
+		scf_end = omp_get_wtime();
 		libint2::finalize();
 	}
+
+
+
 
 	long long int prec_mem = (long long int) nroe/2*(long long int) nroao* (long long int) nroao* (long long int) nroao;
 	std::cout << "Need " << prec_mem*sizeof(double) << " bytes (" << prec_mem*sizeof(double)/1024/1024 << " MB) for precalculation\n";
@@ -306,12 +320,13 @@ int main(int argc, char const *argv[]) {
 	double mp2_end   = omp_get_wtime();
 
 	std::cout <<"\n\nTIMINGS:\n";
+	std::cout << std::setw( PWIDTH_L ) << "TEI [s]:" <<std::setw( PWIDTH_R )<<ints_start - ints_end<< "s \n";
+	std::cout << std::setw( PWIDTH_L ) << "SCF [s]:" <<std::setw( PWIDTH_R )<<scf_end-scf_start<< "s \n";
 	std::cout << std::setw( PWIDTH_L ) << "4-index [s]:" <<std::setw( PWIDTH_R )<<trafo_end-trafo_start<< "s \n";
 	std::cout << std::setw( PWIDTH_L ) << "MP2 [s]:" <<std::setw( PWIDTH_R )<<mp2_end-mp2_start<< "s \n";
 
-
 	double total_end = omp_get_wtime();
-
+	std::cout << "---------------------------" << '\n';
 	std::cout<< std::setw( PWIDTH_L ) << "Total [s]:"<<std::setw( PWIDTH_R )<<total_end-total_start<<"s \n";
 	std::cout << "\n\n--END--" << '\n';
 
