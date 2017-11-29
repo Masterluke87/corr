@@ -37,8 +37,8 @@ set scf PRINT_MOS  true
 
 #e_scf,ref_wfn = energy('scf',return_wfn=True)
 ref_wfn = psi4.core.Wavefunction.build(mymol , psi4.core.get_global_option('BASIS'))
-aux     = psi4.core.BasisSet.build(mymol, "DF_BASIS_SCF", "", "RIFIT", psi4.core.get_global_option('BASIS'))
-aux2    = psi4.core.BasisSet.build(mymol, "DF_BASIS_MP2", "", "JKFIT", psi4.core.get_global_option('BASIS'))
+aux     = psi4.core.BasisSet.build(mymol, "DF_BASIS_SCF", "", "JKFIT", psi4.core.get_global_option('BASIS'))
+aux2    = psi4.core.BasisSet.build(mymol, "DF_BASIS_MP2", "", "RIFIT", psi4.core.get_global_option('BASIS'))
 
 ref_wfn.set_basisset("JKFIT",aux)
 ref_wfn.set_basisset("RIFIT",aux2)

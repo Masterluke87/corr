@@ -500,9 +500,12 @@ void run_export_sys(SharedWavefunction ref_wfn,std::string pref,
 	int naux_2  = ref_wfn->get_basisset("RIFIT")->nbf();
 	auto molecule = ref_wfn->molecule();
 	std::shared_ptr<Matrix> coord (new Matrix(molecule->geometry()));
-	std::string basisNameOB = ref_wfn->basisset()->name();
-	std::string basisNameJK = ref_wfn->get_basisset("JKFIT")->name();
-	std::string basisNameRI = ref_wfn->get_basisset("RIFIT")->name();
+	std::string basisNameOB = ref_wfn->basisset()->target();
+	std::string basisNameJK = ref_wfn->get_basisset("JKFIT")->target();
+	std::string basisNameRI = ref_wfn->get_basisset("RIFIT")->target();
+
+
+
 
 	basisNameOB.resize(32);
 	basisNameJK.resize(32);

@@ -229,9 +229,11 @@ int main(int argc, char const *argv[]) {
 		prec_ints =  new double[prec_mem/worldsize];
 	}
 
+
+	
+
 	//4-index trans
 	double trafo_start = omp_get_wtime();
-
 	long long int kstep = nroao;
 	long long int jstep = nroao*kstep;
 	long long int istep = nroao*jstep;
@@ -320,7 +322,7 @@ int main(int argc, char const *argv[]) {
 	double mp2_end   = omp_get_wtime();
 
 	std::cout <<"\n\nTIMINGS:\n";
-	std::cout << std::setw( PWIDTH_L ) << "TEI [s]:" <<std::setw( PWIDTH_R )<<ints_start - ints_end<< "s \n";
+	std::cout << std::setw( PWIDTH_L ) << "TEI [s]:" <<std::setw( PWIDTH_R )<<ints_end - ints_start<< "s \n";
 	std::cout << std::setw( PWIDTH_L ) << "SCF [s]:" <<std::setw( PWIDTH_R )<<scf_end-scf_start<< "s \n";
 	std::cout << std::setw( PWIDTH_L ) << "4-index [s]:" <<std::setw( PWIDTH_R )<<trafo_end-trafo_start<< "s \n";
 	std::cout << std::setw( PWIDTH_L ) << "MP2 [s]:" <<std::setw( PWIDTH_R )<<mp2_end-mp2_start<< "s \n";
