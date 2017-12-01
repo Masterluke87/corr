@@ -213,6 +213,22 @@ int main(int argc, char const *argv[]) {
 		libint2::finalize();
 	}
 
+     libint2::initialize();
+     std::vector<libint2::Atom> atoms(nroa);
+     for (size_t i = 0; i < nroa; i++) {
+         atoms[i].atomic_number = charges[i];
+         atoms[i].x = coord[i*3+0];
+         atoms[i].y = coord[i*3+1];
+         atoms[i].z = coord[i*3+2];
+     }
+
+     libint2::BasisSet dfbs(basisNameRI,atoms);
+
+
+
+     libint2::finalize();
+
+
 
 
 
