@@ -10,10 +10,9 @@ plugin_load("./syshfwplug.so")
 
 
 molecule mymol {
-#O  0.0 0.0 0.0
-#H  1.0 1.0 0.0
-Au -1.0 0.0 0.0
-Au 1.5 0.0 0.0
+O  0.0 0.0 0.0
+H  1.0 1.0 0.0
+H  1.0 -1.0 0.0
 symmetry c1
 }
 
@@ -24,10 +23,10 @@ set {
 set syshfwplug {
   pref mytest
   dryrun false
-  do_tei false
+  do_tei true
   do_oei true
   do_rijk false
-  do_rimp2 false
+  do_rimp2 true
   print 1
 }
 

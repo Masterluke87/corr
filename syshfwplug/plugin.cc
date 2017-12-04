@@ -391,21 +391,80 @@ long long int run_rimp2(SharedWavefunction ref_wfn, std::string pref){
 
 
 	auto aoBasis  = ref_wfn->basisset();
-	auto aux2     = ref_wfn->get_basisset("RIFIT");
+    auto aux     = ref_wfn->get_basisset("RIFIT");
 
 	int nbf   = aoBasis->nbf();
-	int naux2 = aux2->nbf();
+    int naux = aux->nbf();
 
 	const double cutoff2el = 1.e-12;
 	long long int count=0;
-	auto zero = BasisSet::zero_ao_basis_set();
-	std::shared_ptr<IntegralFactory> fact(new IntegralFactory(aux2,zero,aoBasis,aoBasis));
+
+    std::shared_ptr<BasisSet> zero = BasisSet::zero_ao_basis_set();
+    std::shared_ptr<IntegralFactory> rifactory_J(new IntegralFactory(aux, zero, aux, zero));
+    std::shared_ptr<TwoBodyAOInt> Jint (rifactory_J->eri());
+    SharedMatrix AOmetric(new Matrix("AO Basis DF Metric", naux, naux));
+    double** W = AOmetric->pointer(0);
+    const double *Jbuffer = Jint->buffer();
+    for (int MU=0; MU < aux->nshell(); ++MU) {
+        int nummu = aux->shell(MU).nfunction();
+        for (int NU=0; NU <= MU; ++NU) {
+            int numnu = aux->shell(NU).nfunction();
+            Jint->compute_shell(MU, 0, NU, 0);
+            int index = 0;
+            for (int mu=0; mu < nummu; ++mu) {
+                int omu = aux->shell(MU).function_index() + mu;
+                for (int nu=0; nu < numnu; ++nu, ++index) {
+                    int onu = aux->shell(NU).function_index() + nu;
+                    W[omu][onu] = Jbuffer[index];
+                    W[onu][omu] = Jbuffer[index];
+                }
+            }
+        }
+    }
+    SharedMatrix eigvec(new Matrix("eigvecs",naux,naux));
+    double** vecp = eigvec->pointer();
+
+    C_DCOPY(naux*(size_t)naux,W[0],1,vecp[0],1);
+    double tol = 1.0E-10;
+    double* eigval = new double[naux];
+    int lwork = naux * 3;
+    double* work = new double[lwork];
+    int stat = C_DSYEV('v','u',naux,vecp[0],naux,eigval,work,lwork);
+
+    SharedMatrix Jcopy(new Matrix("Jcopy", naux, naux));
+    double** Jcopyp = Jcopy->pointer();
+    C_DCOPY(naux*(size_t)naux,vecp[0],1,Jcopyp[0],1);
+
+    double max_J = eigval[naux-1];
+    int nsig = 0;
+    for (int ind=0; ind<naux; ind++) {
+        if (eigval[ind] / max_J < tol || eigval[ind] <= 0.0)
+            eigval[ind] = 0.0;
+        else {
+            nsig++;
+            eigval[ind] = 1.0 / sqrt(eigval[ind]);
+        }
+        // scale one set of eigenvectors by the diagonal elements j^{-1/2}
+        C_DSCAL(naux, eigval[ind], vecp[ind], 1);
+    }
+    delete[] eigval;
+    C_DGEMM('T','N',naux,naux,naux,1.0,Jcopyp[0],naux,vecp[0],naux,0.0,W[0],naux);
+    std::clog<<"\n Metric JKFIT done \n";
+
+
+    SharedMatrix B(new Matrix("Bso", naux, nbf * nbf));
+    SharedMatrix A(new Matrix("Aso", naux, nbf * nbf));
+
+    double** Ap = A->pointer();
+    double** Bp = B->pointer();
+
+    std::shared_ptr<IntegralFactory> fact(new IntegralFactory(aux,zero,aoBasis,aoBasis));
 	std::shared_ptr<TwoBodyAOInt> auxeri(fact->eri());
 	const double *buffer = auxeri->buffer();
 	count = 0;
-	for (int P = 0; P < aux2->nshell(); P++) {
-		int np = aux2->shell(P).nfunction();
-		int pstart = aux2->shell(P).function_index();
+    for (int P = 0; P < aux->nshell(); P++) {
+        int np = aux->shell(P).nfunction();
+        int pstart = aux->shell(P).function_index();
 		for (int M = 0; M < aoBasis->nshell(); M++) {
 			int nm = aoBasis->shell(M).nfunction();
 			int mstart = aoBasis->shell(M).function_index();
@@ -417,24 +476,30 @@ long long int run_rimp2(SharedWavefunction ref_wfn, std::string pref){
 				for (int p = 0, index = 0; p < np; p++) {
 					for (int m = 0; m < nm; m++) {
 						for (int n = 0; n < nn; n++, index++) {
-							//Bp[p + pstart][(m + mstart) * nbf + (n + nstart)] = buffer[index];
-							if (fabs(buffer[index])  > cutoff2el) {
-								count++;
-								if (count%(long long int)1.25E8 == 0) {
-									std::cout<<count/(long long int)1.25E8<<'\t'<<std::flush;
-								}
-							}
+                            Bp[p + pstart][(m + mstart) * nbf + (n + nstart)] = buffer[index];
 						}
 					}
 				}
 			}
 		}
 	}
+    C_DGEMM('N','N',naux, nbf * nbf, naux, 1.0, W[0], naux, Bp[0], nbf * nbf, 0.0,
+             Ap[0], nbf * nbf);
 
-	std::cout << "RIMP2 export not yet implemented" << '\n';
+    std::cout << "RIMP2 calculated" << '\n';
+
+    double* BPQ = new double[naux*nbf*nbf];
+    for (int i =0; i<naux;i++)
+        for (int j = 0; j<nbf; j++)
+            for (int k = 0; k<nbf; k++)
+                BPQ[i*nbf*nbf + j*nbf + k] = Ap[i][j*nbf + k];
+
+    std::ofstream datf;
+    datf.open(pref+".rimp2");
+    datf.write((char*) BPQ , naux*nbf*nbf*sizeof(double));
 	return count;
 
-
+    delete[] BPQ;
 
 }
 
