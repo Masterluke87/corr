@@ -34,7 +34,7 @@ int main(int argc, char const *argv[]) {
 
     double*        coord;       //atomic coordinats               3*nroa
     double*        charges;     //atomic charges                    nroa
-    double*              zeff;              //in case ecps are used
+    double*        zeff;        //in case ecps are used             nroa
     double*        mass;        //atomic masses                     nroa
 
     std::string basisNameOB;
@@ -50,14 +50,13 @@ int main(int argc, char const *argv[]) {
     }
 
     std::string prefix = argv[1];
-
     read_system(prefix+".sys",&nroe,&nroa,&nroao,&naux_1,
                 &naux_2,&nrofint,&nrofaux,&nrofaux2,&coord,
                 &charges,&zeff,&mass,&basisNameOB,&basisNameJK,&basisNameRI);
 
     double ion_rep =  calc_ion_rep( nroa, coord, zeff);
 
-    {  //output
+    {     //output
 
         std::cout << "\nSYSTEMDATA" << '\n';
         std::cout << "----------" << "\n\n";
@@ -85,6 +84,8 @@ int main(int argc, char const *argv[]) {
     double scf_end;
     double ints_end;
 
+    std::map<std::string,std::pair<double,double> > timer;
+
 
 
     double* dumd;
@@ -102,8 +103,8 @@ int main(int argc, char const *argv[]) {
 
     double*        Tmat_libint;
     double*        Hmat_libint;
-    double*              Smat_libint;
-    double*              Vmat_libint;
+    double*        Smat_libint;
+    double*        Vmat_libint;
 
     double*        Tmat_trans;
     double*        Hmat_trans;
@@ -134,13 +135,17 @@ int main(int argc, char const *argv[]) {
 
     Vmat_trans = &(dumd[inc]); inc+=nroao*nroao;
 
+    // Always read the One-Electron Matrices
+    // Maybe on a day in a far far future, we calculate the OEI
+
     read_oei(prefix+".oei",nroao,Hmat,Tmat, Smat,Vmat);
-
-
-
     double* intval;
     unsigned short* intnums;
     long long int sortcount[4];
+
+    //Two possibilities:
+    //1) ERI provided -> read them
+    //2) NO ERI provided -> Transform Hmat to Libint -> Calculate -> ERI
 
     if (nrofint > 0) {
         std::cout << "Two electron integrals provided, reading in .." << '\n';
@@ -150,27 +155,6 @@ int main(int argc, char const *argv[]) {
         ints_start = omp_get_wtime();
         read_tei(prefix+".tei",nrofint,sortcount,intval,intnums);
         ints_end = omp_get_wtime();
-
-        calc_S12(nroao, Smat, Som12);
-
-        read_wav_HF(prefix+".ahfw",nroao,MOens,MOs);
-        { //check of gd orbitals are provided;
-            double modiag=0.0;
-            for (size_t i = 0; i < nroao; i++) {
-                modiag += MOs[i*nroao+i];
-            }
-            if (std::fabs(modiag) < 0.1) {
-                std::cout << "No converged MOs provided... doing core guess" << '\n';
-                for (int i =0; i<nroao*nroao; i++)
-                    Fmat[i] = Hmat[i];
-                double *tmpmat = new double[nroao*nroao];
-                diag_Fmat(nroao, Fmat,MOs,MOens,Som12, tmpmat);
-                delete[] tmpmat;
-            }
-        }
-        scf_start = omp_get_wtime();
-        run_scf(nroao,nroe,MOs,Pmat,Hmat,Fmat,intnums,intval,sortcount,nrofint,Som12,100,ion_rep);
-        scf_end = omp_get_wtime();
     }else{
         std::cout << "No Tei's provided ... using libint to calculate them" << '\n';
         libint2::initialize();
@@ -195,28 +179,34 @@ int main(int argc, char const *argv[]) {
         ints_start = omp_get_wtime();
         calculate_libint_tei(atoms,obs,nrofint,&intval,&intnums,sortcount);
         ints_end = omp_get_wtime();
-        std::cout<<"Integral evaluation: "<<std::setw( 4 )<<ints_start - ints_end <<" [s]"<<"\n\n";
-        calc_S12(nroao, Smat, Som12);
-        read_wav_HF(prefix+".ahfw",nroao,MOens,MOs);
-        {             //check if gd orbitals are provided;
-            double modiag=0.0;
-            for (size_t i = 0; i < nroao; i++) {
-                modiag += MOs[i*nroao+i];
-            }
-            if (std::fabs(modiag) < 0.1) {
-                std::cout << "No converged MOs provided... doing core guess" << '\n';
-                for (int i =0; i<nroao*nroao; i++)
-                    Fmat[i] = Hmat[i];
-                double *tmpmat = new double[nroao*nroao];
-                diag_Fmat(nroao, Fmat,MOs,MOens,Som12, tmpmat);
-                delete[] tmpmat;
-            }
-        }
-        scf_start = omp_get_wtime();
-        run_scf(nroao,nroe,MOs,Pmat,Hmat,Fmat,intnums,intval,sortcount,nrofint,Som12,100,ion_rep);
-        scf_end = omp_get_wtime();
         libint2::finalize();
     }
+    calc_S12(nroao, Smat, Som12);
+    read_wav_HF(prefix+".ahfw",nroao,MOens,MOs);
+    {             //check of gd orbitals are provided;
+        double modiag=0.0;
+        for (size_t i = 0; i < nroao; i++) {
+            modiag += MOs[i*nroao+i];
+        }
+        if (std::fabs(modiag) < 0.1) {
+            std::cout << "No converged MOs provided... doing core guess" << '\n';
+            for (int i =0; i<nroao*nroao; i++)
+                Fmat[i] = Hmat[i];
+            double *tmpmat = new double[nroao*nroao];
+            diag_Fmat(nroao, Fmat,MOs,MOens,Som12, tmpmat);
+            delete[] tmpmat;
+        }
+    }
+
+    timer["SCF"] = std::make_pair(0.0,0.0);
+    timer["SCF"].first =omp_get_wtime();
+    scf_start = omp_get_wtime();
+    run_scf(nroao,nroe,MOs,Pmat,Hmat,Smat,Fmat,MOens,intnums,intval,sortcount,nrofint,Som12,100,ion_rep);
+    timer["SCF"].second=omp_get_wtime();
+    scf_end = omp_get_wtime();
+
+
+
 /*
     //RI-with libint
     {
@@ -257,7 +247,7 @@ int main(int argc, char const *argv[]) {
             }
          }
     }
-    */
+ */
     libint2::finalize();
 
 
@@ -276,10 +266,6 @@ int main(int argc, char const *argv[]) {
     }else{
         prec_ints =  new double[prec_mem/worldsize];
     }
-
-
-
-
     //4-index trans
     double trafo_start = omp_get_wtime();
     long long int kstep = nroao;
@@ -302,199 +288,51 @@ int main(int argc, char const *argv[]) {
     }
 
     double trafo_end = omp_get_wtime();
-    //
-    //calculate the Hartree-Fock energy:
-    //
-    double E_hf = 0.0;
-    double oneE = 0.0;
-    double twoE = 0.0;
-    int mu = 0;
-    int nu = 0;
-    double* HMo = new double[nroao*nroao];
-    double* GMo = new double[nroao*nroao];
-    double* FMo = new double[nroao*nroao];
-    for (size_t i = 0; i < nroao*nroao; i++) {
-        HMo[i] = 0.0;
-        GMo[i] = 0.0;
-        FMo[i] = 0.0;
-    }
 
-    for (int i = 0; i < nroao; i++) {
-        for (int j = 0; j < nroao; j++) {
-            for (int mu = 0; mu < nroao; mu++) {
-                for (int nu = 0; nu < nroao; nu++) {
-                    HMo[i*nroao + j] += MOs[i*nroao + mu] * Hmat[mu*nroao + nu] * MOs[j*nroao + nu];
-
-                }
-            }
-        }
-    }
-
-    for (int i = 0; i < nroao; i++) {
-        for (int j = 0; j < nroao; j++) {
-            for (int k = 0; k < nroe/2; k++) {
-                GMo[i*nroao + j] += (2*prec_ints[k*istep + k*jstep + i*kstep + j]
-                                     -prec_ints[k*istep + i*jstep + k*kstep + j]);
-            }
-        }
-    }
-
-    for (int i = 0; i < nroao; i++) {
-        for (int j = 0; j < nroao; j++) {
-            FMo[i*nroao + j] = HMo[i*nroao + j] + GMo[i*nroao + j];
-        }
-    }
-
-    //    run_non_canonical_mp2(nroao,nroe,prec_ints,FMo);
-
-    for (size_t i = 0; i < nroe/2; i++) {
-        oneE += 2 * HMo[i*nroao + i];
-    }
-    oneE += ion_rep;
-    std::cout<<"\n\n\n"<<std::setw( PWIDTH_L )<< "oneE:" <<std::setw( 16 )<<oneE<<'\n';
-
-    for (size_t i = 0; i < nroe/2; i++) {
-        for (size_t j = 0; j < nroe/2; j++) {
-            twoE+= (2 *prec_ints[i*istep + i*jstep + j*kstep + j]
-                    - prec_ints[i*istep + j*jstep + i*kstep + j]);
-
-        }
-    }
-    std::cout << std::setw( PWIDTH_L ) << "twoE:" <<std::setw( PWIDTH_R )<<twoE<< "\n";
-    std::cout << std::setw( PWIDTH_L ) << "HF:"   <<std::setw( PWIDTH_R )<<oneE+twoE<<"\n";
-    ///END Hartree-Fock
+    double* FMo  = new double[nroao*nroao];
+    build_FMo(nroao,Fmat,FMo,MOs);
 
 
     //RI-MP2
     double ritrafo_start = 0.0;
     double ritrafo_end   = 0.0;
+    double rimp2_start   = 0.0;
+    double rimp2_end     = 0.0;
     {
         ritrafo_start = omp_get_wtime();
-        int nocc = nroe/2;
-        int nvir = nroao-nroe/2;
-        double* BPQ = new double[naux_2*nroao*nroao];
-        double* BiQ = new double[naux_2*nroao*nroao];
-        double* Bia = new double[naux_2*nroao*nroao];
-
-        for(int i=0;i<naux_2*nroao*nroao;i++){
-            BiQ[i] =0.0;
-            Bia[i] =0.0;
-        }
-
-        std::ifstream datf;
-        datf.open(prefix+".rimp2");
-        datf.read((char*) BPQ , naux_2*nroao*nroao*sizeof(double));
-        datf.close();
-
-        /*
-        int a,b,c,d;
-        double aoint = 0.0;
-        double riint = 0.0;
-        double diff=0.0;
-        double maxdiff=0.0;
-        double cumdiff=0.0;
-
-        for (int j=0;j<nrofint;j++)
-        {
-        a =  intnums[j*4+0];
-        b =  intnums[j*4+1];
-        c =  intnums[j*4+2];
-        d =  intnums[j*4+3];
-        aoint = intval[j];
-        riint = 0.0;
-        for (int i=0;i<naux_2;i++){
-            riint += BPQ[i*nroao*nroao+a*nroao+b]*BPQ[i*nroao*nroao+c*nroao+d];
-        }
-        diff = std::fabs(aoint-riint);
-        cumdiff+=diff;
-        if (diff>maxdiff)
-            maxdiff=diff;
-        }
-        std::cout<<"Difference(cum): "<<cumdiff;
-        std::cout<<"Difference(max): "<<maxdiff;
-        */
-        for (int Q=0; Q<naux_2;Q++)
-            for (int i=0;i<nroao;i++)
-                for (int mu=0; mu<nroao; mu++)
-                    for (int nu=0; nu<nroao;nu++)
-                        BiQ[Q*nroao*nroao + i*nroao + nu] +=  MOs[i*nroao+mu]*BPQ[Q*nroao*nroao + mu*nroao + nu];
-
-        for (int Q=0; Q<naux_2;Q++)
-           for (int a=0;a<nroao;a++)
-               for (int i =0; i<nroao;i++)
-                    for (int nu=0; nu<nroao;nu++)
-                        Bia[Q*nroao*nroao+i*nroao+a]+= MOs[a*nroao + nu]*BiQ[Q*nroao*nroao + i*nroao + nu ];
-
+        double* Bia = new double[naux_2*nroe/2*(nroao-nroe/2)];
+        read_transform_ri(prefix,nroe,nroao,naux_2,MOs,Bia);
         ritrafo_end = omp_get_wtime();
 
-        double iajb = 0.0;
-        double ibja = 0.0;
-        double EMP2,EMP2_SS,EMP2_OS;
-        EMP2=EMP2_SS=EMP2_OS=0.0;
-        for (int i = 0; i < nroe/2; i++) {
-          for (int j = 0; j < nroe/2; j++) {
-            for (int a = nroe/2; a < nroao; a++) {
-              for (int b = nroe/2;  b < nroao; b++) {
-                  iajb = ibja = 0.0;
-                  for (int Q=0;Q<naux_2;Q++){
-                      ibja += Bia[Q*nroao*nroao+i*nroao+b]*Bia[Q*nroao*nroao+j*nroao+a];
-                      iajb += Bia[Q*nroao*nroao+i*nroao+a]*Bia[Q*nroao*nroao+j*nroao+b];
-                  }
+        rimp2_start = omp_get_wtime();
+        run_canonical_mp2_ri(nroe,nroao,naux_2,Bia,FMo);
+        rimp2_end = omp_get_wtime();
 
-                EMP2_SS += - (iajb*(iajb))/ (FMo[a*nroao +a]+FMo[b*nroao+b]-FMo[i*nroao+i]-FMo[j*nroao+j]);
-                EMP2_OS += - ((iajb - ibja)*iajb)/(FMo[a*nroao+a]+FMo[b*nroao+b]-FMo[i*nroao +i]-FMo[j*nroao + j]);
-              }
-            }
-          }
-        }
-
-        EMP2 = EMP2_OS + EMP2_SS;
-        std::cout<<"\nRI-Results:";
-        std::cout <<std::setw( PWIDTH_L ) << "EMP2_SS:" <<std::setw( PWIDTH_R )<<EMP2_SS<< '\n';
-        std::cout <<std::setw( PWIDTH_L ) << "EMP2_OS:" <<std::setw( PWIDTH_R )<<EMP2_OS<< '\n';
-        std::cout <<std::setw( PWIDTH_L ) << "EMP2:"    <<std::setw( PWIDTH_R )<<EMP2<< '\n';
-
-
-        /* DEBUG
-        long long int kstep = nroao;
-        long long int jstep = nroao*kstep;
-        long long int istep = nroao*jstep;
-
-        int i,j,k,l;
-        i=j=k=l=0;
-        for (int i=0; i<nocc;i++)
-            for (int j=0;j<nroao;j++)
-                for (int k=0;k<nroao;k++)
-                    for (int l=0;l<nroao;l++){
-                riint =0.0;
-            for (int Q=0;Q<naux_2;Q++)
-            {
-                riint += Bia[Q*nroao*nroao+i*nroao+j] *Bia[Q*nroao*nroao+k*nroao+l];
-            }
-           // std::cout<< prec_ints[i*istep+j*jstep+k*kstep+l] << " "<<riint<<"\n";
-        } */
-        delete[] BPQ;
-        delete[] BiQ;
         delete[] Bia;
+    } //end RI-MP2
 
-    }
-
-
+    //canonical mp2
     double mp2_start = omp_get_wtime();
     run_canonical_mp2(nroe,nroao,prec_ints,FMo);
     double mp2_end   = omp_get_wtime();
+
 
     std::cout <<"\n\nTIMINGS:\n";
     std::cout << std::setw( PWIDTH_L ) << "TEI [s]:" <<std::setw( PWIDTH_R )<<ints_end - ints_start<< "s \n";
     std::cout << std::setw( PWIDTH_L ) << "SCF [s]:" <<std::setw( PWIDTH_R )<<scf_end-scf_start<< "s \n";
     std::cout << std::setw( PWIDTH_L ) << "4-index [s]:" <<std::setw( PWIDTH_R )<<trafo_end-trafo_start<< "s \n";
     std::cout << std::setw( PWIDTH_L ) << "ri-4ind [s]:" <<std::setw( PWIDTH_R )<<ritrafo_end-ritrafo_start<< "s \n";
+    std::cout << std::setw( PWIDTH_L ) << "RI-MP2 [s]:" <<std::setw( PWIDTH_R )<<rimp2_end-rimp2_start<< "s \n";
     std::cout << std::setw( PWIDTH_L ) << "MP2 [s]:" <<std::setw( PWIDTH_R )<<mp2_end-mp2_start<< "s \n";
 
     double total_end = omp_get_wtime();
     std::cout << "---------------------------" << '\n';
     std::cout<< std::setw( PWIDTH_L ) << "Total [s]:"<<std::setw( PWIDTH_R )<<total_end-total_start<<"s \n";
     std::cout << "\n\n--END--" << '\n';
+
+    for(auto a: timer) {
+        std::cout<<a.first<<" "<< a.second.second - a.second.first;
+    }
 
     return 0;
 }

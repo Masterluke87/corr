@@ -477,6 +477,7 @@ long long int run_rimp2(SharedWavefunction ref_wfn, std::string pref){
 					for (int m = 0; m < nm; m++) {
 						for (int n = 0; n < nn; n++, index++) {
                             Bp[p + pstart][(m + mstart) * nbf + (n + nstart)] = buffer[index];
+			    count++;
 						}
 					}
 				}
@@ -497,9 +498,9 @@ long long int run_rimp2(SharedWavefunction ref_wfn, std::string pref){
     std::ofstream datf;
     datf.open(pref+".rimp2");
     datf.write((char*) BPQ , naux*nbf*nbf*sizeof(double));
-	return count;
-
     delete[] BPQ;
+    return count;
+
 
 }
 

@@ -5,7 +5,7 @@ MYTEST.*
 cmake_install.cmake
 *.gch
 *.o
-build/
+build*
 syshfwplug/CMakeFiles/
 syshfwplug/__init__.pyc
 syshfwplug/pymodule.pyc
@@ -16,3 +16,4 @@ syshfwplug/psi.*
 syshfwplug/timer.dat
 syshfwplug/output.dat
 *.swp
+src/CMakeLists.txt.user
