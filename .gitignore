@@ -17,3 +17,4 @@ syshfwplug/timer.dat
 syshfwplug/output.dat
 *.swp
 src/CMakeLists.txt.user
+syshfwplug/plugin.creator.user

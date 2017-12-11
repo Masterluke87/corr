@@ -1,7 +1,7 @@
 cmake_minimum_required (VERSION 3.9)
 project (mp2)
 
-set (CMAKE_CXX_STANDARD 11)
+set (CMAKE_CXX_STANDARD 14)
 
 find_package( BLAS REQUIRED )
 find_package( CBLAS REQUIRED )

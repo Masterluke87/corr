@@ -1,5 +1,6 @@
 #include <iostream>
 #include <cstring>
+#include <memory>
 #include <sstream>
 #include <iomanip>
 #include <cmath>
@@ -17,7 +18,16 @@ int dgemm_(char *, char *,
            int *,double *,
            int *,double *, double *, int *);
 int daxpy_(int*,double*,double*,int*,double*, int*);
+
+double dnrm2_(int *,double*, int* );
+
+void dgels_( char* , int* , int* , int* , double* , int* ,
+                double* , int* , double* , int* , int* );
+
 }
+
+extern "C" void  dgesv_(int* n, int*  nrhs,double* a,int* lda,int *ipiv,double* b,int* ldb,int* info);
+
 
 void form_core_guess(int nroao,double* Fmat, double* Hmat,double * Som12,double* MOs,double* MOens)
 {
@@ -99,10 +109,13 @@ double twoE(int nroao,double* Pmat,double* Fmat){
 
 double calc_diis_error(int nroao,double* Fmat,double* Pmat,double* Smat){
 
-    double* SDF = new double[nroao*nroao];
-    double* FDS = new double[nroao*nroao];
+    double* SDF  = new double[nroao*nroao];
+    double* FDS  = new double[nroao*nroao];
+    double* grad = new double[nroao*nroao];
     memset(SDF,0,nroao*nroao*sizeof(double));
     memset(FDS,0,nroao*nroao*sizeof(double));
+    memset(grad,0,nroao*nroao*sizeof(double));
+
     for(int i=0; i<nroao; i++) {
         for(int j=0; j<nroao; j++) {
             for (int mu = 0; mu < nroao; mu++) {
@@ -117,11 +130,16 @@ double calc_diis_error(int nroao,double* Fmat,double* Pmat,double* Smat){
     }
     double error = 0.0;
     for (int i=0;i<nroao*nroao;i++){
-        error += std::fabs(SDF[i] - FDS[i]);
+        grad[i] = (SDF[i] - FDS[i]);
     }
     delete[] SDF;
     delete[] FDS;
-    return error/(nroao*nroao);
+    int ndim = nroao*nroao;
+    int incx = 1;
+    double norm = 0.0;
+    norm = dnrm2_(&ndim,grad,&incx);
+    delete[] grad;
+    return norm;
 }
 void run_scf(int nroao,int nroe, double* C, double* Pmat,double* Hmat,double* Smat,double* Fmat,double* MOens,
              unsigned short* intnums, double* intvals, long long int* sortcount,
@@ -131,13 +149,29 @@ void run_scf(int nroao,int nroe, double* C, double* Pmat,double* Hmat,double* Sm
 
     double* tmpmat = new double[nroao*nroao];
 
+    double diis_thresh = 0.01;
+    bool   diis        = false;
+    int    diis_size   = 4;
+    double* diis_mem   = new double[2*diis_size*nroao*nroao];
+    memset(diis_mem,0,diis_size*nroao*nroao*sizeof(double));
+
+
+
     double Escf  = 0.0;
     double DE    = 10.0;
     double Eold  = 100.0;
     double damp  = 0.5;
     double start = 0.0;
     double end   = 0.0;
-    double error = 0.0;
+
+    std::vector<double> diis_error(diis_size,0.0);
+    std::vector<double*> diis_mat(diis_size);
+
+    for (int i=0;i<diis_size;i++){
+        diis_mat[i] = &diis_mem[i*nroao*nroao];
+    }
+
+
     int iter=0;
     build_Pmat(C,nroao,nroe,Pmat,0.0);
     std::cout<<std::fixed<<std::setprecision(10);
@@ -148,6 +182,83 @@ void run_scf(int nroao,int nroe, double* C, double* Pmat,double* Hmat,double* Sm
         build_Pmat(C,nroao,nroe,Pmat,damp);
         build_Fmat(nroao,Fmat,Pmat,Hmat,intvals,intnums,sortcount,nrofint);
         error = calc_diis_error(nroao,Fmat,Pmat,Smat);
+
+
+        for(int i=1;i<diis_size;i++)
+              diis_error[i-1] = diis_error[i];
+
+        for(int i=1;i<diis_size;i++){
+            for(int j=0;j<nroao*nroao;j++){
+                diis_mat[i-1][j] = diis_mat[i][j];
+            }
+        }
+
+        for(int j=0;j<nroao*nroao;j++)
+            diis_mat.back()[j] = Fmat[j];
+
+
+
+        diis_error.back() = error;
+
+
+        if (error<diis_thresh){
+            if (!diis){
+                std::cout<<"Starting DIIS \n";
+                diis = true;
+            }
+            damp =0.0;
+            std::cout<<"E: [";
+            for(auto a:diis_error)
+                std::cout<<a<<", ";
+            int d_size = (diis_size+1);
+            double* B = new double[d_size*d_size];
+            double* c = new double[d_size];
+
+            for (int i=0;i<diis_size;i++){
+                for (int j=0;j<diis_size;j++){
+                    B[i*d_size + j] = diis_error[i] * diis_error[j];
+            }
+                B[i*d_size + d_size-1] = -1;
+                B[(d_size-1)*d_size+i] = -1;
+                c[i] = 0.0;
+
+            }
+            B[d_size*d_size-1] = 0.0;
+
+
+
+            c[d_size-1] = -1;
+
+            int* IPIV = new int[d_size];
+            int info,nrhs;
+            nrhs =1;
+            double* work;
+            int lwork = -1;
+            double wkopt;
+            char mode[1] ={'N'};
+            //dgesv_(&d_size,&nrhs,B,&d_size,IPIV,c,&d_size,&info);
+            dgels_(mode,&d_size,&d_size,&nrhs,B,&d_size,c,&d_size,&wkopt,&lwork,&info);
+            lwork = (int)wkopt;
+            work = (double*)malloc( lwork*sizeof(double) );
+            dgels_(mode,&d_size,&d_size,&nrhs,B,&d_size,c,&d_size,work,&lwork,&info);
+
+            std::cout<<"\nC: [";
+            for(int i=0;i<d_size;i++)
+                std::cout<<c[i]<<", ";
+            std::cout<<"]\nd_size:"<<d_size-1<<"\n\n";
+
+            double nsum = 0.0;
+            /*
+            memset(Fmat,0,nroao*nroao*sizeof(double));
+            for (int j=0;j<diis_size;j++){
+                for(int i=0;i<nroao*nroao;i++){
+                    Fmat[i]+=c[j]*diis_mat[j][i];
+               }
+            }*/
+
+        }
+
+
         Escf = Calc_e_el(nroao,Fmat,Pmat,Hmat);
         DE = Escf - Eold;
         Eold = Escf;
