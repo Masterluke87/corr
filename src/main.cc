@@ -3,6 +3,7 @@
 #include <sstream>
 #include <string>
 #include <cmath>
+#include "MATH/ops_mat.h"
 #include "IO/ops_io.h"
 #include "SCF/ops_rhf.h"
 #include "SCF/scf.h"
@@ -12,6 +13,7 @@
 #include <iomanip>
 #include <omp.h>
 #include <libint2.hpp>
+#include <cblas.h>
 
 #define PWIDTH_L 12
 #define PWIDTH_R 16
@@ -207,7 +209,6 @@ int main(int argc, char const *argv[]) {
 
 
 
-/*
     //RI-with libint
     {
      libint2::initialize();
@@ -219,16 +220,26 @@ int main(int argc, char const *argv[]) {
          atoms[i].z = coord[i*3+2];
      }
 
+
+
+     //libint2::Engine::
      libint2::BasisSet obs(basisNameOB,atoms);
      libint2::BasisSet dfbs(basisNameRI,atoms);
+
+     std::cout<<"MaxL"<<dfbs.max_l();
+
      libint2::Engine eri2_engine(libint2::Operator::coulomb, dfbs.max_nprim(), dfbs.max_l());
      eri2_engine.set_braket(libint2::BraKet::xs_xs);
 
      auto shell2bf = dfbs.shell2bf();
      const auto& buf_vec_eri = eri2_engine.results();
 
+     if (dfbs.nbf()!=naux_2){
+         std::cout<<"DANGER!! STH IS WRONG";
+         exit(0);
+     }
      double * J = new double[dfbs.nbf()*dfbs.nbf()];
-     int naux = dfbs.nbf();
+
 
      for(auto s2=0; s2!=dfbs.size(); ++s2)
          for(auto s1=s2; s1!=dfbs.size(); ++s1){
@@ -243,13 +254,43 @@ int main(int argc, char const *argv[]) {
 
                  for(auto f1=0; f1!=n1; ++f1)
                      for(auto f2=0; f2!=n2; ++f2)
-                         J[(bf1+f1)*naux + (bf2+f2)] = ints_shellset_eri[f1*n2+f2];
+                         J[(bf1+f1)*naux_2 + (bf2+f2)] = ints_shellset_eri[f1*n2+f2];
             }
          }
-    }
- */
-    libint2::finalize();
 
+     double* eigval   = new double[naux_2];
+     double* eigvec   = new double[naux_2*naux_2];
+     double* eigvec_c = new double[naux_2*naux_2];
+
+
+     std::memcpy(eigvec,J,naux_2*naux_2*sizeof(double));
+
+     int lwork = 3*naux_2;
+     int info;
+     double* work = new double[lwork];
+
+     dsyev_("V","U",&naux_2,eigvec,&naux_2,eigval,work,&lwork,&info);
+
+     std::memcpy(eigvec_c,eigvec,naux_2*naux_2*sizeof(double));
+
+     double max_eig = eigval[naux_2-1];
+
+     for (int i = 0;i<naux_2;i++){
+         if(eigval[i]/max_eig < 1E-12 || eigval[i] <0)
+             eigval[i] =0.0;
+         else
+             eigval[i] = 1 / std::sqrt(eigval[i]);
+         cblas_dscal(naux_2,eigval[i],&eigvec[i],1);
+     }
+     cblas_dgemm(CblasColMajor,CblasTrans,CblasNoTrans,naux_2,naux_2,naux_2,1.0,eigvec_c,naux_2,eigvec,naux_2,0.0,J,naux_2);
+
+
+
+     delete[] eigval;
+     delete[] eigvec_c;
+     delete[] eigvec;
+    }
+    libint2::finalize();
 
 
 
@@ -293,7 +334,7 @@ int main(int argc, char const *argv[]) {
     build_FMo(nroao,Fmat,FMo,MOs);
 
 
-    //RI-MP2
+    //RI-MP2 //trafo
     double ritrafo_start = 0.0;
     double ritrafo_end   = 0.0;
     double rimp2_start   = 0.0;

@@ -11,3 +11,6 @@ void mat_T_mat(long long int np, double* mat_i1, double* mat_i2, double* mat_f);
 void trans_mat(int np, double* mat, double* trans, double* tmpmat, int dir);
 void trans_mat(long long int np, double* mat, double* trans, double* tmpmat, int dir); //for large matrices
 void pmv(double* mat, double* vi, double* vo, int nroao);
+
+extern "C" void  dsyev_(char* JOBZ, char*  UPLO,int* N, double* A, int* LDA,
+                        double* W, double* WORK, int* LWORK, int*  INFO );

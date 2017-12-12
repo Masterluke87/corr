@@ -11,8 +11,7 @@
 //Functions
 
 //Extern Functions
-extern "C" void  dsyev_(char* JOBZ, char*  UPLO,int* N, double* A, int* LDA,
-                        double* W, double* WORK, int* LWORK, int*  INFO );
+
 
 /*******************************************************************************
  * Matrix diagonalization                                                      *
