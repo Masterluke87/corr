@@ -590,7 +590,7 @@ void calculate_libint_tei(std::vector<libint2::Atom> &atoms,libint2::BasisSet &o
 						}
 					}
 				}
-	nrofint       = count;
+
 	*intval        = new double[count];                       //two electron integrals
 	*intnums       = new unsigned short[count*4];             //two electron indices
 	count=0;
@@ -627,7 +627,7 @@ void calculate_libint_tei(std::vector<libint2::Atom> &atoms,libint2::BasisSet &o
 										integral = ints_shellset_eri[f1*n2*n3*n4+f2*n3*n4+f3*n4+f4];
 										if (((bf1+f1) >= (bf2+f2)) && ((bf3+f3) >= (bf4+f4)) && (((bf1+f1)*(bf1+f1+1)/2 +(bf2+f2))>=((bf3+f3)*(bf3+f3+1)/2+(bf4+f4))))
 										{
-											if (std::fabs(integral)>1E-12) {
+                                            if (std::fabs(integral)>1.0E-12) {
 												(*intval)[count] = integral;
 												(*intnums)[count*4+0] = bf1+f1;
 												(*intnums)[count*4+1] = bf2+f2;
@@ -640,6 +640,7 @@ void calculate_libint_tei(std::vector<libint2::Atom> &atoms,libint2::BasisSet &o
 					}
 				}
 				std::cout << "Schwarz count:" <<sw_count<< '\n';
+    nrofint        = count;
 	resort_integrals(*intnums,*intval,count,sortcount);
 
 }

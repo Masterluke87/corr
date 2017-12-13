@@ -5,6 +5,7 @@ set (CMAKE_CXX_STANDARD 14)
 
 find_package( BLAS REQUIRED )
 find_package( CBLAS REQUIRED )
+find_package( LAPACKE REQUIRED )
 find_package( LAPACK REQUIRED )
 FIND_PACKAGE( OpenMP REQUIRED )
 if(OPENMP_FOUND)
@@ -38,4 +39,4 @@ add_executable(mp2 main.cc
 		          SCF/ops_rhf.cc
 		          SCF/scf.cc )
 
-target_link_libraries(mp2 ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES} ${CBLAS_LIBRARIES} ${LIBINT_LIBRARY_DIR}/libint2.a)
+target_link_libraries(mp2 ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES} ${CBLAS_LIBRARIES} ${LAPACKE_LIBRARIES} ${LIBINT_LIBRARY_DIR}/libint2.a)

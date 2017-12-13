@@ -421,6 +421,7 @@ long long int run_rimp2(SharedWavefunction ref_wfn, std::string pref){
             }
         }
     }
+
     SharedMatrix eigvec(new Matrix("eigvecs",naux,naux));
     double** vecp = eigvec->pointer();
 
@@ -434,6 +435,8 @@ long long int run_rimp2(SharedWavefunction ref_wfn, std::string pref){
     SharedMatrix Jcopy(new Matrix("Jcopy", naux, naux));
     double** Jcopyp = Jcopy->pointer();
     C_DCOPY(naux*(size_t)naux,vecp[0],1,Jcopyp[0],1);
+	
+
 
     double max_J = eigval[naux-1];
     int nsig = 0;
@@ -450,7 +453,8 @@ long long int run_rimp2(SharedWavefunction ref_wfn, std::string pref){
     delete[] eigval;
     C_DGEMM('T','N',naux,naux,naux,1.0,Jcopyp[0],naux,vecp[0],naux,0.0,W[0],naux);
     std::clog<<"\n Metric JKFIT done \n";
-
+   
+    AOmetric->print_out();
 
     SharedMatrix B(new Matrix("Bso", naux, nbf * nbf));
     SharedMatrix A(new Matrix("Aso", naux, nbf * nbf));
@@ -487,7 +491,10 @@ long long int run_rimp2(SharedWavefunction ref_wfn, std::string pref){
     C_DGEMM('N','N',naux, nbf * nbf, naux, 1.0, W[0], naux, Bp[0], nbf * nbf, 0.0,
              Ap[0], nbf * nbf);
 
+
+
     std::cout << "RIMP2 calculated" << '\n';
+    A->print_out();
 
     double* BPQ = new double[naux*nbf*nbf];
     for (int i =0; i<naux;i++)

@@ -31,7 +31,7 @@ void read_transform_ri(std::string prefix,  //prefix to find the file
                        int nroao,           //nr of bsf in aobasis
                        int naux_2,          //nr of aux basis functions
                        double* MOs,         //orbitals for transformation
-                       double* Bia)         //output - transformed array containing mointegrals
+                       double* Bia)        //output - transformed array containing mointegrals
 {
 
     int nocc = nroe/2;
@@ -62,6 +62,31 @@ void read_transform_ri(std::string prefix,  //prefix to find the file
     delete[] BiQ;
     delete[] BPQ;
 
+}
+
+void transform_ri(int nroe,            //nr of electrons
+                  int nroao,           //nr of bsf in aobasis
+                  int naux_2,          //nr of aux basis functions
+                  double* MOs,         //orbitals for transformation
+                  double* BPQ,          //input - calculated b^Q_pq
+                  double* Bia)         //output - transformed array containing mointegrals)
+{
+    int nocc = nroe/2;
+    int nvir = nroao-nroe/2;
+    double* BiQ = new double[naux_2*nocc*nroao];
+    memset(BiQ,0,sizeof(double)*naux_2*nocc*nroao);
+    memset(Bia,0,sizeof(double)*naux_2*nocc*nvir);
+    for (int Q=0; Q<naux_2; Q++)
+        for (int i=0; i<nocc; i++)
+            for (int mu=0; mu<nroao; mu++)
+                for (int nu=0; nu<nroao; nu++)
+                    BiQ[Q*nocc*nroao + i*nroao + nu] +=  MOs[i*nroao+mu]*BPQ[Q*nroao*nroao + mu*nroao + nu];
+    for (int Q=0; Q<naux_2; Q++)
+        for (int a=0; a<nvir; a++)
+            for (int i =0; i<nocc; i++)
+                for (int nu=0; nu<nroao; nu++)
+                    Bia[Q*nocc*nvir+i*nvir+a]+= MOs[(a+nroe/2)*nroao + nu]*BiQ[Q*nocc*nroao + i*nroao + nu ];
+    delete[] BiQ;
 }
 
 

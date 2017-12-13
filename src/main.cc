@@ -14,6 +14,8 @@
 #include <omp.h>
 #include <libint2.hpp>
 #include <cblas.h>
+#include <lapacke.h>
+
 
 #define PWIDTH_L 12
 #define PWIDTH_R 16
@@ -210,85 +212,198 @@ int main(int argc, char const *argv[]) {
 
 
     //RI-with libint
+    double* BPQ;
+
     {
-     libint2::initialize();
-     std::vector<libint2::Atom> atoms(nroa);
-     for (size_t i = 0; i < nroa; i++) {
-         atoms[i].atomic_number = charges[i];
-         atoms[i].x = coord[i*3+0];
-         atoms[i].y = coord[i*3+1];
-         atoms[i].z = coord[i*3+2];
-     }
+        libint2::initialize();
+        std::vector<libint2::Atom> atoms(nroa);
+        for (size_t i = 0; i < nroa; i++) {
+            atoms[i].atomic_number = charges[i];
+            atoms[i].x = coord[i*3+0];
+            atoms[i].y = coord[i*3+1];
+            atoms[i].z = coord[i*3+2];
+        }
+        //libint2::Engine::
+        libint2::BasisSet obs(basisNameOB,atoms);
+        libint2::BasisSet dfbs(basisNameRI,atoms);
+
+        libint2::Engine eri2_engine(libint2::Operator::coulomb, dfbs.max_nprim(), dfbs.max_l());
+        eri2_engine.set_braket(libint2::BraKet::xs_xs);
+
+        auto shell2bf = dfbs.shell2bf();
+        const auto& buf_vec_eri = eri2_engine.results();
+
+        if (dfbs.nbf()!=naux_2) {
+            std::cout<<"DANGER!! STH IS WRONG";
+            exit(0);
+        }
+        double * J = new double[dfbs.nbf()*dfbs.nbf()];
+        memset(J,0,naux_2*naux_2*sizeof(double));
 
 
+        for(auto s1=0; s1!=dfbs.size(); ++s1)
+            for(auto s2=0; s2!=dfbs.size(); ++s2) {
+                eri2_engine.compute(dfbs[s1], dfbs[s2]);
+                auto ints_shellset_eri = buf_vec_eri[0];
+                if (ints_shellset_eri!=NULL) {
 
-     //libint2::Engine::
-     libint2::BasisSet obs(basisNameOB,atoms);
-     libint2::BasisSet dfbs(basisNameRI,atoms);
+                    auto bf1 = shell2bf[s1]; // first basis function in first shell
+                    auto n1 = dfbs[s1].size(); // number of basis functions in first shell
+                    auto bf2 = shell2bf[s2]; // first basis function in second shell
+                    auto n2 = dfbs[s2].size(); // number of basis functions in second shell
 
-     std::cout<<"MaxL"<<dfbs.max_l();
-
-     libint2::Engine eri2_engine(libint2::Operator::coulomb, dfbs.max_nprim(), dfbs.max_l());
-     eri2_engine.set_braket(libint2::BraKet::xs_xs);
-
-     auto shell2bf = dfbs.shell2bf();
-     const auto& buf_vec_eri = eri2_engine.results();
-
-     if (dfbs.nbf()!=naux_2){
-         std::cout<<"DANGER!! STH IS WRONG";
-         exit(0);
-     }
-     double * J = new double[dfbs.nbf()*dfbs.nbf()];
-
-
-     for(auto s2=0; s2!=dfbs.size(); ++s2)
-         for(auto s1=s2; s1!=dfbs.size(); ++s1){
-             eri2_engine.compute(dfbs[s1], dfbs[s2]);
-             auto ints_shellset_eri = buf_vec_eri[0];
-             if (ints_shellset_eri!=NULL){
-
-                 auto bf1 = shell2bf[s1]; // first basis function in first shell
-                 auto n1 = dfbs[s1].size(); // number of basis functions in first shell
-                 auto bf2 = shell2bf[s2]; // first basis function in second shell
-                 auto n2 = dfbs[s2].size(); // number of basis functions in second shell
-
-                 for(auto f1=0; f1!=n1; ++f1)
-                     for(auto f2=0; f2!=n2; ++f2)
-                         J[(bf1+f1)*naux_2 + (bf2+f2)] = ints_shellset_eri[f1*n2+f2];
+                    for(auto f1=0; f1!=n1; ++f1)
+                        for(auto f2=0; f2!=n2; ++f2)
+                            J[(bf1+f1)*naux_2 + (bf2+f2)] = ints_shellset_eri[f1*n2+f2];
+                }
             }
-         }
 
-     double* eigval   = new double[naux_2];
-     double* eigvec   = new double[naux_2*naux_2];
-     double* eigvec_c = new double[naux_2*naux_2];
+        double* eigval   = new double[naux_2];
+        double* eigvec   = new double[naux_2*naux_2];
+        double* eigvec_c = new double[naux_2*naux_2];
 
 
-     std::memcpy(eigvec,J,naux_2*naux_2*sizeof(double));
+        std::memcpy(eigvec,J,naux_2*naux_2*sizeof(double));
 
-     int lwork = 3*naux_2;
-     int info;
-     double* work = new double[lwork];
+        LAPACKE_dsyev(LAPACK_ROW_MAJOR,'V','U',naux_2,eigvec,naux_2,eigval);
 
-     dsyev_("V","U",&naux_2,eigvec,&naux_2,eigval,work,&lwork,&info);
-
-     std::memcpy(eigvec_c,eigvec,naux_2*naux_2*sizeof(double));
-
-     double max_eig = eigval[naux_2-1];
-
-     for (int i = 0;i<naux_2;i++){
-         if(eigval[i]/max_eig < 1E-12 || eigval[i] <0)
-             eigval[i] =0.0;
-         else
-             eigval[i] = 1 / std::sqrt(eigval[i]);
-         cblas_dscal(naux_2,eigval[i],&eigvec[i],1);
-     }
-     cblas_dgemm(CblasColMajor,CblasTrans,CblasNoTrans,naux_2,naux_2,naux_2,1.0,eigvec_c,naux_2,eigvec,naux_2,0.0,J,naux_2);
+        //debug
+        double* tmpJ = new double[naux_2*naux_2];
+        memset(tmpJ,0,naux_2*naux_2*sizeof(double));
+        {
+            for(int z=0;z<naux_2;z++)
+                for(int y=0;y<naux_2;y++)
+                    for(int x=0;x<naux_2;x++)
+                        tmpJ[y*naux_2+z] += eigvec[y*naux_2 +x]* eigval[x] * eigvec[z*naux_2+x];
+        }
 
 
 
-     delete[] eigval;
-     delete[] eigvec_c;
-     delete[] eigvec;
+
+
+
+
+
+        std::memcpy(eigvec_c,eigvec,naux_2*naux_2*sizeof(double));
+
+        double max_eig = eigval[naux_2-1];
+        double tol = 1.0E-10;
+        for (int i = 0; i<naux_2; i++) {
+            if(eigval[i]/max_eig < tol || eigval[i] <0)
+                eigval[i] =0.0;
+            else
+                eigval[i] = 1 / std::sqrt(eigval[i]);
+          //  cblas_dscal(naux_2,eigval[i],&eigvec[i*naux_2],1);
+        }
+
+//        cblas_dgemm(CblasRowMajor,CblasNoTrans,CblasTrans,naux_2,naux_2,
+//                    naux_2,1.0,eigvec_c,naux_2,eigvec,naux_2,0.0,J,naux_2);
+        {
+            memset(J,0,naux_2*naux_2*sizeof(double));
+            for(int z=0;z<naux_2;z++)
+                for(int y=0;y<naux_2;y++)
+                    for(int x=0;x<naux_2;x++)
+                        J[y*naux_2+z] += eigvec[y*naux_2 +x]* eigval[x] * eigvec[z*naux_2+x];
+        }
+
+
+        libint2::Engine eri3_engine(libint2::Operator::coulomb,
+                                    std::max(dfbs.max_nprim(),obs.max_nprim()),
+                                    std::max(dfbs.max_l(),obs.max_l()));
+
+
+        double* B = new double[naux_2*nroao*nroao];
+        memset(B,0,naux_2*nroao*nroao*sizeof(double));
+
+        eri3_engine.set_braket(libint2::BraKet::xs_xx);
+        auto shell2bf_ob = obs.shell2bf();
+        const auto& buf_vec_eri3 = eri3_engine.results();
+
+
+        const auto& unitshell = libint2::Shell::unit();
+        for(auto s1=0; s1!=dfbs.size(); ++s1) {
+            for (auto s2=0; s2!= obs.size(); ++s2) {
+                for (auto s3=0; s3!=obs.size(); ++s3) {
+                    eri3_engine.compute(dfbs[s1],obs[s2],obs[s3]);
+ //                   eri3_engine.compute2<libint2::Operator::coulomb, libint2::BraKet::xs_xx, 0>(
+//                                dfbs[s1], unitshell, obs[s2], obs[s3]);
+                    auto ints_shellset_eri3 = buf_vec_eri3[0];
+
+                    if (ints_shellset_eri3!=NULL) {
+                        auto bf1 = shell2bf[s1]; // first basis function in first shell
+                        auto n1 = dfbs[s1].size(); // number of basis functions in first shell
+
+                        auto bf2 = shell2bf_ob[s2]; // first basis function in second shell
+                        auto n2 =  obs[s2].size();// number of basis functions in second shell
+
+                        auto bf3 = shell2bf_ob[s3]; // first basis function in second shell
+                        auto n3 =  obs[s3].size();// number of basis functions in second shell
+
+                        for(auto f1=0; f1!=n1; ++f1)
+                            for(auto f2=0; f2!=n2; ++f2)
+                                for(auto f3=0; f3!=n3; ++f3)
+                                    B[(bf1+f1)*nroao*nroao + (bf2+f2)*nroao + (bf3+f3)] = ints_shellset_eri3[f1*n2*n3+f2*n3+f3];
+                    }
+                }
+            }
+        }
+        BPQ  = new double[naux_2*nroao*nroao];
+        double* BPQ2= new double[naux_2*nroao*nroao];
+        memset(BPQ,0,naux_2*nroao*nroao*sizeof(double));
+
+
+        //BPQ  = matmult(B,J^-1/2)
+    //  cblas_dgemm(CblasRowMajor,CblasTrans,CblasNoTrans,naux_2,nroao*nroao,
+     //               naux_2,1.0,J,naux_2,B,nroao*nroao,0.0,BPQ,nroao*nroao);
+
+        for(int P=0; P<naux_2; P++) {
+            for(int Q=0; Q<naux_2; Q++) {
+                for(int pq=0; pq<nroao*nroao; pq++) {
+                    BPQ[P*nroao*nroao + pq] += J[P*naux_2 + Q] * B[Q*nroao*nroao + pq];
+                }
+            }
+        }
+
+
+       // for (int i=0;i<naux_2*nroao*nroao;i++)
+       //     diff+=BPQ2[i] - BPQ[i];
+
+      //  std::cout<<"DIFF: "<<diff<<"\n";
+
+
+        std::ifstream datf;
+        datf.open(prefix+".rimp2");
+        datf.read((char*) BPQ2, naux_2*nroao*nroao*sizeof(double));
+        datf.close();
+
+        double diff=0.0;
+        for (int i=0;i<naux_2*nroao*nroao;i++)
+            diff+=std::fabs(BPQ2[i] - BPQ[i]);
+
+        std::cout<<"DIFF: "<<diff<<"\n";
+
+        diff=0.0;
+        for (int i=sortcount[0]; i<sortcount[1]; i++) {
+            int a = intnums[4*i+0];
+            int b = intnums[4*i+1];
+            int c = intnums[4*i+2];
+            int d = intnums[4*i+3];
+            double integral = 0.0;
+            for(int Q=0; Q<naux_2; Q++) {
+                integral  += BPQ[Q*nroao*nroao+ a*nroao +b]*BPQ[Q*nroao*nroao+ c*nroao +d];
+            }
+            diff += std::fabs(integral - intval[i]);
+            //std::cout<<a<<" "<<b<<" "<<" "<<c<<" "<<d<<" "<<integral<<" "<<intval[i]<<" "<< integral -intval[i] <<"\n";
+        }
+        std::cout<<"accumulated diffs:"<<diff;
+
+
+
+        delete[] eigval;
+        delete[] eigvec_c;
+        delete[] eigvec;
+        delete[] J;
+        delete[] B;
     }
     libint2::finalize();
 
@@ -343,7 +458,9 @@ int main(int argc, char const *argv[]) {
         ritrafo_start = omp_get_wtime();
         double* Bia = new double[naux_2*nroe/2*(nroao-nroe/2)];
         read_transform_ri(prefix,nroe,nroao,naux_2,MOs,Bia);
+        //transform_ri(nroe,nroao,naux_2,MOs,BPQ,Bia);
         ritrafo_end = omp_get_wtime();
+
 
         rimp2_start = omp_get_wtime();
         run_canonical_mp2_ri(nroe,nroao,naux_2,Bia,FMo);
