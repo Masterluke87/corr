@@ -1,3 +1,7 @@
+#ifndef OPS_RHF_H
+#define OPS_RHF_H
+
+
 #include <vector>
 #include <libint2.hpp>
 
@@ -19,12 +23,11 @@ double calc_op_1el(int nroao, double* opmat, double* Pmat);
 double build_Pmat_dscf(int nroao, int nroe, double* Pmat, double* Pmat_old,
 		       double* MOs, double damp);
 
-void calculate_libint_oei(std::vector<libint2::Atom> &atoms,libint2::BasisSet &obs,double* zeff,
-	double* Hmat       ,double* Tmat       ,double* Smat       ,double* Vmat,
-	double* Hmat_libmat,double* Tmat_libmat,double* Smat_libint,double* Vmat_libint,
-	double* Hmat_trans ,double* Tmat_trans ,double* Smat_trans ,double* Vmat_trans);
+void calculate_libint_oei(std::vector<libint2::Atom> &atoms, libint2::BasisSet &obs, double* zeff,
+    double* Hmat       , double* Tmat       , double* Smat       , double* Vmat);
 
 
 void resort_integrals(unsigned short int*  intnums, double* intval,  long long int nrofint, long long int* sortcount );
 void calculate_libint_tei(std::vector<libint2::Atom> &atoms,libint2::BasisSet &obs,
 	long long int &nrofint,double **intval,unsigned short** intnums,long long int * sortcount);
+#endif

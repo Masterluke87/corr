@@ -41,13 +41,6 @@ void form_core_guess(int nroao,double* Fmat, double* Hmat,double * Som12,double*
     delete[] tmpmat;
 }
 
-
-
-
-
-
-
-
 void build_Pmat(double *C,int nroao, int nroe, double *Pmat,double damp)
 {
     double alpha=2.0 * (1-damp);
@@ -152,13 +145,13 @@ void calc_diis_error(int nroao,double* Fmat,double* Pmat,double* Smat,double* gr
 void run_scf(int nroao,int nroe, double* C, double* Pmat,double* Hmat,double* Smat,double* Fmat,double* MOens,
              unsigned short* intnums, double* intvals, long long int* sortcount,
              long long int nrofint, double* Som12, int maxiter,double ion_rep){
-    std::cout << "+++++++++++SCF++++++++++" << '\n';
+    std::cout << "\nSCF:\n----" << '\n';
 
     double* tmpmat = new double[nroao*nroao];
 
 
     //DIIS stuff
-    bool use_diis      = true;
+    bool use_diis      = true  ;
 
     double diis_thresh = 0.001;
     bool diis          = false;

@@ -1,3 +1,5 @@
+void MOtrans(double *MOs, int nroao, int nroe, long long nrofint, long long int* sortcount, double* intval, unsigned short *intnums, double** prec_ints);
+
 double calc_mo2int_bf(int i, int j, int k, int l, int nroao, double* MOs,
                       long long int nrofint, long long int* sortcount, double* intval,
                       unsigned short* intnums);

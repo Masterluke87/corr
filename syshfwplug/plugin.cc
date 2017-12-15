@@ -391,10 +391,10 @@ long long int run_rimp2(SharedWavefunction ref_wfn, std::string pref){
 
 
 	auto aoBasis  = ref_wfn->basisset();
-    auto aux     = ref_wfn->get_basisset("RIFIT");
+        auto aux     = ref_wfn->get_basisset("RIFIT");
 
 	int nbf   = aoBasis->nbf();
-    int naux = aux->nbf();
+        int naux = aux->nbf();
 
 	const double cutoff2el = 1.e-12;
 	long long int count=0;
@@ -421,6 +421,19 @@ long long int run_rimp2(SharedWavefunction ref_wfn, std::string pref){
             }
         }
     }
+    //debug
+    {
+		double* Jout = new double[naux*naux];
+		for (int i=0;i<naux;i++)
+			for(int j=0;j<naux;j++)
+					Jout[i*naux+j] = AOmetric->get(i,j);
+		std::ofstream datf;
+		datf.open(pref+".J");
+		datf.write((char*) Jout,naux*naux*sizeof(double));
+		datf.close();
+	}
+
+
 
     SharedMatrix eigvec(new Matrix("eigvecs",naux,naux));
     double** vecp = eigvec->pointer();

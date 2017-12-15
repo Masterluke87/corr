@@ -25,70 +25,33 @@ void build_FMo(int nroao,
 }
 
 
-
-void read_transform_ri(std::string prefix,  //prefix to find the file
-                       int nroe,            //nr of electrons
-                       int nroao,           //nr of bsf in aobasis
-                       int naux_2,          //nr of aux basis functions
-                       double* MOs,         //orbitals for transformation
-                       double* Bia)        //output - transformed array containing mointegrals
+void MOtrans(double* MOs, int nroao,int nroe, long long int nrofint,long long int* sortcount, double* intval,unsigned short* intnums, double** prec_ints)
 {
+    long long int prec_mem = (long long int) nroe/2*(long long int) nroao* (long long int) nroao* (long long int) nroao;
+    std::cout << "Need " << prec_mem*sizeof(double) << " bytes (" << prec_mem*sizeof(double)/1024/1024 << " MB) for precalculation\n";
 
-    int nocc = nroe/2;
-    int nvir = nroao-nroe/2;
-    double* BPQ = new double[naux_2*nroao*nroao];
-    double* BiQ = new double[naux_2*nocc*nroao];
+    *prec_ints =  new double[prec_mem];
 
-    memset(BiQ,0,sizeof(double)*naux_2*nocc*nroao);
-    memset(Bia,0,sizeof(double)*naux_2*nocc*nvir);
-
-    std::ifstream datf;
-    datf.open(prefix+".rimp2");
-    datf.read((char*) BPQ, naux_2*nroao*nroao*sizeof(double));
-    datf.close();
-
-    for (int Q=0; Q<naux_2; Q++)
-        for (int i=0; i<nocc; i++)
-            for (int mu=0; mu<nroao; mu++)
-                for (int nu=0; nu<nroao; nu++)
-                    BiQ[Q*nocc*nroao + i*nroao + nu] +=  MOs[i*nroao+mu]*BPQ[Q*nroao*nroao + mu*nroao + nu];
-    for (int Q=0; Q<naux_2; Q++)
-        for (int a=0; a<nvir; a++)
-            for (int i =0; i<nocc; i++)
-                for (int nu=0; nu<nroao; nu++)
-                    Bia[Q*nocc*nvir+i*nvir+a]+= MOs[(a+nroe/2)*nroao + nu]*BiQ[Q*nocc*nroao + i*nroao + nu ];
-
-
-    delete[] BiQ;
-    delete[] BPQ;
+    //4-index trans
+    long long int kstep = nroao;
+    long long int jstep = nroao*kstep;
+    long long int istep = nroao*jstep;
+    int i,j,k,l;
+    long long int prec_count = 0;
+    for(i = 0; i < nroe/2; i++) {
+        for(j = 0; j < nroao; j++) {
+            for(k = 0; k < nroao; k++) {
+                for(l = 0; l <  nroao; l++) {
+                    (*prec_ints)[prec_count] = mo2int_op(i, j, k, l,nroao, MOs, nrofint, sortcount, intval, intnums,&std::cout);
+                    prec_count++;
+                }
+            }
+        }
+        std::cout << i << "\t"<<std::flush;
+        if((i+1)%10==0) std::cout << "\n"<<std::flush;
+    }
 
 }
-
-void transform_ri(int nroe,            //nr of electrons
-                  int nroao,           //nr of bsf in aobasis
-                  int naux_2,          //nr of aux basis functions
-                  double* MOs,         //orbitals for transformation
-                  double* BPQ,          //input - calculated b^Q_pq
-                  double* Bia)         //output - transformed array containing mointegrals)
-{
-    int nocc = nroe/2;
-    int nvir = nroao-nroe/2;
-    double* BiQ = new double[naux_2*nocc*nroao];
-    memset(BiQ,0,sizeof(double)*naux_2*nocc*nroao);
-    memset(Bia,0,sizeof(double)*naux_2*nocc*nvir);
-    for (int Q=0; Q<naux_2; Q++)
-        for (int i=0; i<nocc; i++)
-            for (int mu=0; mu<nroao; mu++)
-                for (int nu=0; nu<nroao; nu++)
-                    BiQ[Q*nocc*nroao + i*nroao + nu] +=  MOs[i*nroao+mu]*BPQ[Q*nroao*nroao + mu*nroao + nu];
-    for (int Q=0; Q<naux_2; Q++)
-        for (int a=0; a<nvir; a++)
-            for (int i =0; i<nocc; i++)
-                for (int nu=0; nu<nroao; nu++)
-                    Bia[Q*nocc*nvir+i*nvir+a]+= MOs[(a+nroe/2)*nroao + nu]*BiQ[Q*nocc*nroao + i*nroao + nu ];
-    delete[] BiQ;
-}
-
 
 
 /*******************************************************************************

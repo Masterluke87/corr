@@ -25,17 +25,25 @@ void run_canonical_mp2(int nroe,                //Number of Electrons
       for (int j = 0; j < nroe/2; j++) {
         for (int a = nroe/2; a < nroao; a++) {
           for (int b = nroe/2;  b < nroao; b++) {
-            EMP2_SS += - (prec_ints[i*istep + a*jstep + j*kstep + b]*(prec_ints[i*istep + a*jstep + j*kstep + b]))/ (FMo[a*nroao +a]+FMo[b*nroao+b]-FMo[i*nroao+i]-FMo[j*nroao+j]);
-            EMP2_OS += - (prec_ints[i*istep + a*jstep + j*kstep + b] - prec_ints[i*istep + b*jstep + j*kstep + a])*prec_ints[i*istep + a*jstep + j*kstep + b]/(FMo[a*nroao+a]+FMo[b*nroao+b]-FMo[i*nroao +i]-FMo[j*nroao + j]);
+            EMP2_OS += - (prec_ints[i*istep + a*jstep + j*kstep + b]*(prec_ints[i*istep + a*jstep + j*kstep + b]))/ (FMo[a*nroao +a]+FMo[b*nroao+b]-FMo[i*nroao+i]-FMo[j*nroao+j]);
+            EMP2_SS += - (prec_ints[i*istep + a*jstep + j*kstep + b] - prec_ints[i*istep + b*jstep + j*kstep + a])*prec_ints[i*istep + a*jstep + j*kstep + b]/(FMo[a*nroao+a]+FMo[b*nroao+b]-FMo[i*nroao +i]-FMo[j*nroao + j]);
           }
         }
       }
     }
   EMP2 = EMP2_OS + EMP2_SS;
   std::cout<<"\nMP2-Results:\n";
+  std::cout<<"------------\n";
   std::cout <<std::setw( PWIDTH_L ) << "EMP2_SS:" <<std::setw( PWIDTH_R )<<EMP2_SS<< '\n';
   std::cout <<std::setw( PWIDTH_L ) << "EMP2_OS:" <<std::setw( PWIDTH_R )<<EMP2_OS<< '\n';
   std::cout <<std::setw( PWIDTH_L ) << "EMP2:"    <<std::setw( PWIDTH_R )<<EMP2<< '\n';
+  std::cout<<"\nSCS-MP2-Results:\n";
+  std::cout<<"------------\n";
+  std::cout <<std::setw( PWIDTH_L ) << "EMP2_SS:" <<std::setw( PWIDTH_R )<<EMP2_SS/3.0 << '\n';
+  std::cout <<std::setw( PWIDTH_L ) << "EMP2_OS:" <<std::setw( PWIDTH_R )<<EMP2_OS*6.0/5.0 << '\n';
+  std::cout <<std::setw( PWIDTH_L ) << "EMP2(SCS):"    <<std::setw( PWIDTH_R )<<EMP2_SS/3. +EMP2_OS*6.0/5.0 << '\n';
+
+
 }
 
 
@@ -82,8 +90,8 @@ void run_canonical_mp2_ri(int nroe,         //Number of Electrons
         }
      }
      cblas_dsbmv(CblasRowMajor,CblasLower,nvir*nvir,0,1.0,M,1,X,1,0.0,tmp,1);
-     EMP2_SS += - cblas_ddot(nvir*nvir,tmp,1,M,1);
-     EMP2_OS += - cblas_ddot(nvir*nvir,tmp,1,MD,1);
+     EMP2_OS += - cblas_ddot(nvir*nvir,tmp,1,M,1);
+     EMP2_SS += - cblas_ddot(nvir*nvir,tmp,1,MD,1);
 
      //cblas_dgemm(CblasRowMajor,CblasNoTrans,CblasTrans,nvir,nvir,nvir,1.0,M,nvir,X,nvir,0.0,tmp2,nvir);
      //EMP2_OS += - cblas_ddot(nvir*nvir,tmp,1,M,1);
@@ -101,10 +109,17 @@ void run_canonical_mp2_ri(int nroe,         //Number of Electrons
    }
 
     EMP2 = EMP2_OS + EMP2_SS;
-    std::cout<<"\nRI-Results:\n";
+    std::cout<<"\nRI-MP2-Results:\n";
+    std::cout<<"---------------\n";
     std::cout <<std::setw( PWIDTH_L ) << "EMP2_SS:" <<std::setw( PWIDTH_R )<<EMP2_SS<< '\n';
     std::cout <<std::setw( PWIDTH_L ) << "EMP2_OS:" <<std::setw( PWIDTH_R )<<EMP2_OS<< '\n';
     std::cout <<std::setw( PWIDTH_L ) << "EMP2:"    <<std::setw( PWIDTH_R )<<EMP2<< '\n';
+
+    std::cout<<"\nSCS-RI-MP2-Results:\n";
+    std::cout<<"-------------------\n";
+    std::cout <<std::setw( PWIDTH_L ) << "EMP2_SS:" <<std::setw( PWIDTH_R )<<EMP2_SS/3.0 << '\n';
+    std::cout <<std::setw( PWIDTH_L ) << "EMP2_OS:" <<std::setw( PWIDTH_R )<<EMP2_OS*6.0/5.0 << '\n';
+    std::cout <<std::setw( PWIDTH_L ) << "EMP2(SCS):"    <<std::setw( PWIDTH_R )<<EMP2_SS/3. +EMP2_OS*6.0/5.0 << '\n';
 
 
     delete[] locbuff;

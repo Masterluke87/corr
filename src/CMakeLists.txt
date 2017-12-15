@@ -32,11 +32,12 @@ include_directories(${LIBINT_INCLUDE_DIR})
 
 add_executable(mp2 main.cc
       		    POSTHF/motrans.cc
-              POSTHF/loc_mp2.cc
-              POSTHF/can_mp2.cc
-		          IO/ops_io.cc
-		          MATH/ops_mat.cc
-		          SCF/ops_rhf.cc
-		          SCF/scf.cc )
+                    POSTHF/loc_mp2.cc
+                    POSTHF/can_mp2.cc
+                    POSTHF/ri.cc
+                    IO/ops_io.cc
+                    MATH/ops_mat.cc
+                    SCF/ops_rhf.cc
+                    SCF/scf.cc )
 
 target_link_libraries(mp2 ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES} ${CBLAS_LIBRARIES} ${LAPACKE_LIBRARIES} ${LIBINT_LIBRARY_DIR}/libint2.a)

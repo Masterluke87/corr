@@ -34,7 +34,7 @@ void print_header(){
 
   gethostname(str1, len);
   cout << "++++++++++++++++++++++++++++++++++++++\n";
-  cout << "+A PSI4/MPI/OPENMP/CUDA - MP2 PRORGAM+\n";
+  cout << "+A PSI4/MPI/OPENMP/CUDA - MP2 PROGRAM+\n";
   cout << "++++++++++++++++++++++++++++++++++++++\n";
 
   cout << "Host: " << str1 << "\nDate: " << ctime(&curr_time);

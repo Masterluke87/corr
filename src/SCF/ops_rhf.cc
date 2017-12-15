@@ -13,12 +13,16 @@ extern void transform_MOs(int nroao, double *MOs, double* tmat, double* tmpvec);
 
 
 void calculate_libint_oei(std::vector<libint2::Atom> &atoms,libint2::BasisSet &obs,double* zeff,
-                          double* Hmat,double* Tmat,double* Smat,double* Vmat,
-                          double* Hmat_libint,double* Tmat_libint,double* Smat_libint,double* Vmat_libint,
-                          double* Hmat_trans,double* Tmat_trans,double* Smat_trans,double* Vmat_trans)
+                          double* Hmat,double* Tmat,double* Smat,double* Vmat)
 {
+    //UPDATE: we expect now that the shell order in Libint2 is the same as in Psi4
+    //otherwise uncomment code...
+    int nroao = obs.nbf();
 
-
+    std::unique_ptr<double[]> Tmat_libint(new double[nroao*nroao]);
+    std::unique_ptr<double[]> Hmat_libint(new double[nroao*nroao]);
+    std::unique_ptr<double[]> Smat_libint(new double[nroao*nroao]);
+    std::unique_ptr<double[]> Vmat_libint(new double[nroao*nroao]);
 
 	libint2::Engine s_engine(libint2::Operator::overlap,obs.max_nprim(),obs.max_l());
 	libint2::Engine t_engine(libint2::Operator::kinetic,obs.max_nprim(),obs.max_l());
@@ -30,11 +34,12 @@ void calculate_libint_oei(std::vector<libint2::Atom> &atoms,libint2::BasisSet &o
 	}
 	v_engine.set_params(q);
 
-	int nroao = obs.nbf();
 
 	auto shell2bf = obs.shell2bf();
 	std::vector<int> one_shift;
 	std::vector<int> two_shift;
+ //   two_shift = {0,0,0,0,0,0,0,0,0,0,0};
+ //   one_shift = {0,0,0,0,0,0,0,0,0,0,0};
 	int one_size = 0;
 	int two_size = 0;
 	const auto& buf_vec_t = t_engine.results();
@@ -56,58 +61,60 @@ void calculate_libint_oei(std::vector<libint2::Atom> &atoms,libint2::BasisSet &o
 			auto bf2 = shell2bf[s2]; // first basis function in second shell
 			auto n2 = obs[s2].size(); // number of basis functions in second shell
 
-			//libint order is -l,-l+1...0,1,...l
-			if (obs[s1].contr[0].l == 0) {
-				one_shift = {0};
-				one_size  = 1;
-			}
-			if (obs[s2].contr[0].l == 0) {
-				two_shift = {0};
-				two_size  = 1;
-			}
+            //libint order is -l,-l+1...0,1,...l
+            /*
+            if (obs[s1].contr[0].l == 0) {
+                one_shift = {0};
+                one_size  = 1;
+            }
+            if (obs[s2].contr[0].l == 0) {
+                two_shift = {0};
+                two_size  = 1;
+            }
 
-			if (obs[s1].contr[0].l == 1) {
-				one_shift = {+2,-1, -1 };
-				one_size  = 3;
-			}
-			if (obs[s2].contr[0].l == 1) {
-				two_shift = {+2,-1, -1 };
-				two_size  = 3;
-			}
-			if (obs[s1].contr[0].l == 2) {
-				one_shift = {+4,+1,-2,-2,-1};
-				one_size  = 5;
-			}
-			if (obs[s2].contr[0].l == 2) {
-				two_shift = {+4,+1,-2,-2,-1};
-				two_size  = 5;
-			}
+            if (obs[s1].contr[0].l == 1) {
+                one_shift = {+2,-1, -1 };
+                one_size  = 3;
+            }
+            if (obs[s2].contr[0].l == 1) {
+                two_shift = {+2,-1, -1 };
+                two_size  = 3;
+            }
+            if (obs[s1].contr[0].l == 2) {
+                one_shift = {+4,+1,-2,-2,-1};
+                one_size  = 5;
+            }
+            if (obs[s2].contr[0].l == 2) {
+                two_shift = {+4,+1,-2,-2,-1};
+                two_size  = 5;
+            }
 
-			if (obs[s1].contr[0].l == 3) {
-				one_shift = {+6,+3,0,-3,-3,-2,-1};
-				one_size  = 7;
-			}
-			if (obs[s2].contr[0].l == 3) {
-				two_shift = {+6,+3,0,-3,-3,-2,-1};
-				two_size  = 7;
-			}
+            if (obs[s1].contr[0].l == 3) {
+                one_shift = {+6,+3,0,-3,-3,-2,-1};
+                one_size  = 7;
+            }
+            if (obs[s2].contr[0].l == 3) {
+                two_shift = {+6,+3,0,-3,-3,-2,-1};
+                two_size  = 7;
+            }
 
-			if (obs[s1].contr[0].l == 4) {
-				one_shift = {+8,+5,+2,-1,-4,-4,-3,-2,-1};
-				one_size  = 9;
-			}
-			if (obs[s2].contr[0].l == 4) {
-				two_shift = {+8,+5,+2,-1,-4,-4,-3,-2,-1};
-				two_size  = 9;
-			}
-			if (obs[s1].contr[0].l == 5) {
-				one_shift = {+10,+7,+4,+1,-2,-5,-5,-4,-3,-2,-1};
-				one_size  = 11;
-			}
-			if (obs[s2].contr[0].l == 5) {
-				two_shift = {+10,+7,+4,+1,-2,-5,-5,-4,-3,-2,-1};
-				two_size  = 11;
-			}
+            if (obs[s1].contr[0].l == 4) {
+                one_shift = {+8,+5,+2,-1,-4,-4,-3,-2,-1};
+                one_size  = 9;
+            }
+            if (obs[s2].contr[0].l == 4) {
+                two_shift = {+8,+5,+2,-1,-4,-4,-3,-2,-1};
+                two_size  = 9;
+            }
+            if (obs[s1].contr[0].l == 5) {
+                one_shift = {+10,+7,+4,+1,-2,-5,-5,-4,-3,-2,-1};
+                one_size  = 11;
+            }
+            if (obs[s2].contr[0].l == 5) {
+                two_shift = {+10,+7,+4,+1,-2,-5,-5,-4,-3,-2,-1};
+                two_size  = 11;
+            }
+            */
 			// integrals are packed into ints_shellset in row-major (C) form
 			// this iterates over integrals in this order
 			for(auto f1=0; f1!=n1; ++f1)
@@ -116,11 +123,11 @@ void calculate_libint_oei(std::vector<libint2::Atom> &atoms,libint2::BasisSet &o
 					Smat_libint[(bf1+f1)*obs.nbf() + (bf2+f2)] = ints_shellset_s[f1*n2+f2];
 					Vmat_libint[(bf1+f1)*obs.nbf() + (bf2+f2)] = ints_shellset_v[f1*n2+f2];
 
-					Tmat_trans[(bf1+f1)*obs.nbf() + (bf2+f2)] = Tmat[(bf1+f1+one_shift[f1])*obs.nbf() + (bf2+f2+two_shift[f2])];
-					Smat_trans[(bf1+f1)*obs.nbf() + (bf2+f2)] = Smat[(bf1+f1+one_shift[f1])*obs.nbf() + (bf2+f2+two_shift[f2])];
-					Vmat_trans[(bf1+f1)*obs.nbf() + (bf2+f2)] = Vmat[(bf1+f1+one_shift[f1])*obs.nbf() + (bf2+f2+two_shift[f2])];
 
-					Hmat_trans[(bf1+f1)*obs.nbf() + (bf2+f2)] = Hmat[(bf1+f1+one_shift[f1])*obs.nbf() + (bf2+f2+two_shift[f2])];
+                  //  Tmat_trans[(bf1+f1)*obs.nbf() + (bf2+f2)] = Tmat[(bf1+f1+one_shift[f1])*obs.nbf() + (bf2+f2+two_shift[f2])];
+                  //  Smat_trans[(bf1+f1)*obs.nbf() + (bf2+f2)] = Smat[(bf1+f1+one_shift[f1])*obs.nbf() + (bf2+f2+two_shift[f2])];
+                  //  Vmat_trans[(bf1+f1)*obs.nbf() + (bf2+f2)] = Vmat[(bf1+f1+one_shift[f1])*obs.nbf() + (bf2+f2+two_shift[f2])];
+                  //  Hmat_trans[(bf1+f1)*obs.nbf() + (bf2+f2)] = Hmat[(bf1+f1+one_shift[f1])*obs.nbf() + (bf2+f2+two_shift[f2])];
 				}
 		}
 	}
@@ -138,26 +145,44 @@ void calculate_libint_oei(std::vector<libint2::Atom> &atoms,libint2::BasisSet &o
 	double vmatmax = 0;
 	double hmatmax = 0;
 
-
+/*
 	for (size_t i = 0; i < nroao*nroao; i++) {
-		tmatdiff += fabs(Tmat_trans[i] - Tmat_libint[i]);
-		smatdiff += fabs(Smat_trans[i] - Smat_libint[i]);
-		vmatdiff += fabs(Vmat_trans[i] - Vmat_libint[i]);
-		hmatdiff += fabs(Hmat_trans[i] - Hmat_libint[i]);
+        tmatdiff += fabs(Tmat_trans[i] - Tmat_libint[i]);
+        smatdiff += fabs(Smat_trans[i] - Smat_libint[i]);
+        vmatdiff += fabs(Vmat_trans[i] - Vmat_libint[i]);
+        hmatdiff += fabs(Hmat_trans[i] - Hmat_libint[i]);
 
-		if (fabs(Tmat_trans[i] - Tmat_libint[i])>tmatmax)
-			tmatmax = fabs(Tmat_trans[i] - Tmat_libint[i]);
-		if (fabs(Smat_trans[i] - Smat_libint[i]) > smatmax)
-			smatmax = fabs(Smat_trans[i] - Smat_libint[i]);
-		if (fabs(Vmat_trans[i] - Vmat_libint[i]) > vmatmax)
-			vmatmax = fabs(Vmat_trans[i] - Vmat_libint[i]);
-		if (fabs(Hmat_trans[i] - Hmat_libint[i]) > hmatmax)
-			hmatmax = fabs(Hmat_trans[i] - Hmat_libint[i]);
+        if (fabs(Tmat_trans[i] - Tmat_libint[i])>tmatmax)
+            tmatmax = fabs(Tmat_trans[i] - Tmat_libint[i]);
+        if (fabs(Smat_trans[i] - Smat_libint[i]) > smatmax)
+            smatmax = fabs(Smat_trans[i] - Smat_libint[i]);
+        if (fabs(Vmat_trans[i] - Vmat_libint[i]) > vmatmax)
+            vmatmax = fabs(Vmat_trans[i] - Vmat_libint[i]);
+        if (fabs(Hmat_trans[i] - Hmat_libint[i]) > hmatmax)
+            hmatmax = fabs(Hmat_trans[i] - Hmat_libint[i]);
 
 
 	}
+*/
+    for (size_t i = 0; i < nroao*nroao; i++) {
+        tmatdiff += fabs(Tmat[i] - Tmat_libint[i]);
+        smatdiff += fabs(Smat[i] - Smat_libint[i]);
+        vmatdiff += fabs(Vmat[i] - Vmat_libint[i]);
+        hmatdiff += fabs(Hmat[i] - Hmat_libint[i]);
 
-	std::cout << "Capability check (did the transformation work?): " << '\n';
+        if (fabs(Tmat[i] - Tmat_libint[i])>tmatmax)
+            tmatmax = fabs(Tmat[i] - Tmat_libint[i]);
+        if (fabs(Smat[i] - Smat_libint[i]) > smatmax)
+            smatmax = fabs(Smat[i] - Smat_libint[i]);
+        if (fabs(Vmat[i] - Vmat_libint[i]) > vmatmax)
+            vmatmax = fabs(Vmat[i] - Vmat_libint[i]);
+        if (fabs(Hmat[i] - Hmat_libint[i]) > hmatmax)
+            hmatmax = fabs(Hmat[i] - Hmat_libint[i]);
+
+
+    }
+
+    std::cout << "Compatibility check :" << '\n';
 	std::cout << "tmatdiff:" <<tmatdiff << '\n';
 	std::cout << "smatdiff:" <<smatdiff << '\n';
 	std::cout << "vmatdiff:" <<vmatdiff << '\n';
@@ -168,13 +193,13 @@ void calculate_libint_oei(std::vector<libint2::Atom> &atoms,libint2::BasisSet &o
 	std::cout << "vmatmax :" <<vmatmax << '\n';
 	std::cout << "hmatmax :" <<hmatmax << '\n';
 
-	if (smatmax < 1E-10 && tmatmax<1E-10 && vmatmax<1E-10) {
+    if (smatmax < 1E-8 && tmatmax<1E-8 && vmatmax<1E-8) {
 		std::cout << "It seems the transformation worked" << '\n';
 	}
-
-
-
-
+    else{
+        std::cout << "Something is wrong, consult a programmer! " << '\n';
+        exit(0);
+    }
 }
 
 
@@ -575,20 +600,20 @@ void calculate_libint_tei(std::vector<libint2::Atom> &atoms,libint2::BasisSet &o
 									for(auto f4=0; f4!=n4; ++f4) {
 										//Tmat_libint[(bf1+f1)*obs.nbf() + (bf2+f2)] = ints_shellset_t[f1*n2+f2]
 										integral = ints_shellset_eri[f1*n2*n3*n4+f2*n3*n4+f3*n4+f4];
-										if (std::fabs(integral)>max_in_shell) {
-											max_in_shell=sqrt(std::fabs(integral));
-										}
+                                        if (std::fabs(integral)>max_in_shell) {
+                                            max_in_shell=sqrt(std::fabs(integral));
+                                        }
 
-										if (((bf1+f1) >= (bf2+f2)) && ((bf3+f3) >= (bf4+f4)) && (((bf1+f1)*(bf1+f1+1)/2 +(bf2+f2))>=((bf3+f3)*(bf3+f3+1)/2+(bf4+f4))))
-										{
+                                        if (((bf1+f1) >= (bf2+f2)) && ((bf3+f3) >= (bf4+f4)) && (((bf1+f1)*(bf1+f1+1)/2 +(bf2+f2))>=((bf3+f3)*(bf3+f3+1)/2+(bf4+f4))))
+                                        {
 											if (std::fabs(integral)>1E-12)
 												count++;
-										}
+                                        }
 									}
-						if (s1==s3 && s2 == s4) {
-							Schwarz[s1*obs.size()+s2] = max_in_shell;
-						}
-					}
+                        if (s1==s3 && s2 == s4) {
+                            Schwarz[s1*obs.size()+s2] = max_in_shell;
+                       }
+                    }
 				}
 
 	*intval        = new double[count];                       //two electron integrals
@@ -600,10 +625,10 @@ void calculate_libint_tei(std::vector<libint2::Atom> &atoms,libint2::BasisSet &o
 		for(auto s1=s2; s1!=obs.size(); ++s1)
 			for(auto s4=0; s4!=obs.size(); ++s4)
 				for(auto s3=s4; s3!=obs.size(); ++s3)  {
-					if (Schwarz[s1*obs.size()+s2] * Schwarz[s3*obs.size()+s4]<1E-12 ) {
-						sw_count++;
-						continue;
-					}
+                    if (Schwarz[s1*obs.size()+s2] * Schwarz[s3*obs.size()+s4]<1E-12 ) {
+                        sw_count++;
+                        continue;
+                    }
 					eri_engine.compute(obs[s1], obs[s2], obs[s3], obs[s4]);
 					auto ints_shellset_eri = buf_vec_eri[0];
 
@@ -625,17 +650,17 @@ void calculate_libint_tei(std::vector<libint2::Atom> &atoms,libint2::BasisSet &o
 									for(auto f4=0; f4!=n4; ++f4) {
 										//Tmat_libint[(bf1+f1)*obs.nbf() + (bf2+f2)] = ints_shellset_t[f1*n2+f2]
 										integral = ints_shellset_eri[f1*n2*n3*n4+f2*n3*n4+f3*n4+f4];
-										if (((bf1+f1) >= (bf2+f2)) && ((bf3+f3) >= (bf4+f4)) && (((bf1+f1)*(bf1+f1+1)/2 +(bf2+f2))>=((bf3+f3)*(bf3+f3+1)/2+(bf4+f4))))
-										{
-                                            if (std::fabs(integral)>1.0E-12) {
+                                        if (((bf1+f1) >= (bf2+f2)) && ((bf3+f3) >= (bf4+f4)) && (((bf1+f1)*(bf1+f1+1)/2 +(bf2+f2))>=((bf3+f3)*(bf3+f3+1)/2+(bf4+f4))))
+                                        {
+                                        if (std::fabs(integral)>1.0E-12) {
 												(*intval)[count] = integral;
 												(*intnums)[count*4+0] = bf1+f1;
 												(*intnums)[count*4+1] = bf2+f2;
 												(*intnums)[count*4+2] = bf3+f3;
 												(*intnums)[count*4+3] = bf4+f4;
 												count++;
-											}
-										}
+                                            }
+                                        }
 									}
 					}
 				}
