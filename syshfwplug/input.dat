@@ -28,10 +28,10 @@ set {
 set syshfwplug {
   pref mytest
   dryrun true
-  do_tei true
+  do_tei false
   do_oei true
-  do_rijk false
-  do_rimp2 false
+  do_rijk true
+  do_rimp2 true
   print 1
 }
 
