@@ -14,7 +14,11 @@
 
 
 
-void print_header();
+void print_header(int* nroe,int* nroa,int* nroao,int* naux_1,int* naux_2,long long int* nrofint,
+                  long long int* nrofaux,long long int* nrofaux2,
+                  double* coord,double* charges,double* zeff,
+                  std::string* basisNameOB,std::string* basisNameJK,std::string* basisNameRI);
+
 int  rem_com(char* filename, char* streamstring, int string_length);
 void get_sys_size(std::string sysfile,int* nroe, int* nroao, int* nroa, long long int* nrofint,char* basisName);
 void read_sys(std::string sysfile, double* coord, double* charges, double* mass,

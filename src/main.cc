@@ -27,11 +27,25 @@ int main(int argc, char const *argv[]) {
     int worldsize = 1;
     int rank = 0;
 
+    /*
+     *
+      Part 1 : Initialization
+     *
+     */
+
+    // System Information:
+
     int nroe;                  //Nr of electrons  (if negative, read in center of mass)
-    int nroao;
-    int nroa;
-    int naux_1;
-    int naux_2;
+    int nroa;                  //nr of atoms
+
+    int nroao;                 //nr of basis functions
+    int naux_1;                //nr of /JK
+    int naux_2;                //nr of /C
+
+    std::string basisNameOB;
+    std::string basisNameJK;
+    std::string basisNameRI;
+
 
     double*        coord;       //atomic coordinats               3*nroa
     double*        charges;     //atomic charges                    nroa
@@ -42,12 +56,11 @@ int main(int argc, char const *argv[]) {
     long long int nrofaux;
     long long int nrofaux2;
 
-    std::string basisNameOB;
-    std::string basisNameJK;
-    std::string basisNameRI;
+    std::map<std::string,std::pair<double,double> > timer;
 
-    double total_start = omp_get_wtime();
-    print_header();
+    timer["total"] = std::make_pair(0.0,0.0);
+    timer["total"].first = omp_get_wtime();
+
 
     if(argc != 2) {
         std::cerr << "Need PREFIX\n";
@@ -58,30 +71,11 @@ int main(int argc, char const *argv[]) {
     read_system(prefix+".sys",&nroe,&nroa,&nroao,&naux_1,
                 &naux_2,&nrofint,&nrofaux,&nrofaux2,&coord,
                 &charges,&zeff,&mass,&basisNameOB,&basisNameJK,&basisNameRI);
-
     double ion_rep =  calc_ion_rep( nroa, coord, zeff);
+    print_header(&nroe,&nroa,&nroao,&naux_1,&naux_2,&nrofint,&nrofaux,
+                 &nrofaux2,coord,charges,zeff,
+                 &basisNameOB,&basisNameJK,&basisNameRI);
 
-    {     //output
-
-        std::cout << "\nSYSTEMDATA" << '\n';
-        std::cout << "----------" << "\n\n";
-        std::cout<<std::setw(-2)<<"Z" <<std::setw(10)<<"zeff"<<std::setw(10)<<"x" <<std::setw(10) << "y" <<std::setw(10)<< "z" <<'\n';
-        for (size_t i = 0; i < nroa; i++) {
-            std::cout<<std::setw(-2)<<charges[i]<<std::setw(10)<<zeff[i]<<std::setw(10)<< coord[i*3+0]<<std::setw(10) << coord[i*3+1]<<std::setw(10)<< coord[i*3+2]<<'\n';
-        }
-
-        std::cout << "nroe          :" << nroe<<'\n';
-        std::cout << "nroa          :" << nroa<<'\n';
-        std::cout << "nroao         :" << nroao<<'\n';
-        std::cout << "naux-JK       :" << naux_1<<'\n';
-        std::cout << "naux-RI       :" << naux_2<<'\n';
-        std::cout << "nrofint       :" << nrofint<<'\n';
-        std::cout << "nrofaux(JK)   :" << nrofaux<<'\n';
-        std::cout << "nrofaux(RI)   :" << nrofaux2<< '\n';
-        std::cout << "basisName(OB) :" << basisNameOB<<'\n';
-        std::cout << "basisName(JK) :" << basisNameJK<<'\n';
-        std::cout << "basisName(RI) :" << basisNameRI<<'\n';
-    }
 
     libint2::initialize();
     std::vector<libint2::Atom> atoms(nroa);
@@ -96,15 +90,12 @@ int main(int argc, char const *argv[]) {
     obs.set_pure(true);
     dfbs.set_pure(true);
 
+    /*
+     *
+     * PART2 : One Electron & Electron Matrices and Integrals
+     *
+     */
 
-
-    double scf_start;
-    double ints_start;
-
-    double scf_end;
-    double ints_end;
-
-    std::map<std::string,std::pair<double,double> > timer;
 
 
     double* dumd;
@@ -152,22 +143,27 @@ int main(int argc, char const *argv[]) {
         intval        = new double[nrofint];                   //two electron integrals
         intnums       = new unsigned short[nrofint*4];         //two electron indices
 
-        ints_start = omp_get_wtime();
+        //ints_start = omp_get_wtime();
         read_tei(prefix+".tei",nrofint,sortcount,intval,intnums);
-        ints_end = omp_get_wtime();
+        //ints_end = omp_get_wtime();
     }else{
         std::cout << "No Tei's provided ... using libint to calculate them" << '\n';
 
         calculate_libint_oei(atoms,obs,zeff,Hmat,Tmat, Smat, Vmat);
-
-        ints_start = omp_get_wtime();
+        //ints_start = omp_get_wtime();
         calculate_libint_tei(atoms,obs,nrofint,&intval,&intnums,sortcount);
-        ints_end = omp_get_wtime();
+        //ints_end = omp_get_wtime();
 
     }
     calc_S12(nroao, Smat, Som12);
+
+    /*
+     *
+     * Part 3: Read Guess & Perform SCF
+     *
+     */
     read_wav_HF(prefix+".ahfw",nroao,MOens,MOs);
-    {             //check of gd orbitals are provided;
+    {             //check if gd orbitals are provided;
         double modiag=0.0;
         for (size_t i = 0; i < nroao; i++) {
             modiag += MOs[i*nroao+i];
@@ -181,33 +177,42 @@ int main(int argc, char const *argv[]) {
             delete[] tmpmat;
         }
     }
-
     timer["SCF"] = std::make_pair(0.0,0.0);
     timer["SCF"].first =omp_get_wtime();
-    scf_start = omp_get_wtime();
     run_scf(nroao,nroe,MOs,Pmat,Hmat,Smat,Fmat,MOens,intnums,intval,sortcount,nrofint,Som12,100,ion_rep);
     timer["SCF"].second=omp_get_wtime();
-    scf_end = omp_get_wtime();
 
 
-
-    //RI-with libint big test
-    double* BPQ = new double[naux_2*nroao*nroao];
-    calculate_ri(obs,dfbs,BPQ);
-
-
-    double* prec_ints;
-    double trafo_start = omp_get_wtime();
-    //MOtrans(MOs,nroao,nroe,nrofint,sortcount,intval,intnums,&prec_ints);
-    double trafo_end = omp_get_wtime();
-
-    //POST-HF PART
+    /*
+     * PART 4:
+     * Post Hartree-Fock Part:
+     * BPQ of /c basis
+     * transform to Bia
+     * perform mp2
+     *
+     */
 
     double* FMo  = new double[nroao*nroao];
     build_FMo(nroao,Fmat,FMo,MOs);
 
 
+    {
+        double* prec_ints;
+        double trafo_start = omp_get_wtime();
+        MOtrans(MOs,nroao,nroe,nrofint,sortcount,intval,intnums,&prec_ints);
+        double trafo_end = omp_get_wtime();
+
+        double mp2_start = omp_get_wtime();
+        run_canonical_mp2(nroe,nroao,prec_ints,FMo);
+        double mp2_end   = omp_get_wtime();
+    }
+
+
+
     //RI-MP2 //trafo
+
+    double* BPQ = new double[naux_2*nroao*nroao];
+    calculate_ri(obs,dfbs,BPQ);
     double ritrafo_start = 0.0;
     double ritrafo_end   = 0.0;
     double rimp2_start   = 0.0;
@@ -218,33 +223,33 @@ int main(int argc, char const *argv[]) {
         //read_transform_ri(prefix,nroe,nroao,naux_2,MOs,Bia);
         transform_ri(nroe,nroao,naux_2,MOs,BPQ,Bia);
         ritrafo_end = omp_get_wtime();
-
-
         rimp2_start = omp_get_wtime();
         run_canonical_mp2_ri(nroe,nroao,naux_2,Bia,FMo);
         rimp2_end = omp_get_wtime();
-
         delete[] Bia;
     } //end RI-MP2
 
-    //canonical mp2
-    double mp2_start = omp_get_wtime();
-   // run_canonical_mp2(nroe,nroao,prec_ints,FMo);
-    double mp2_end   = omp_get_wtime();
+
+
+
+    /* Part 5
+     * Print timings
+     */
+
 
 
     std::cout <<"\n\nTIMINGS:\n";
-    std::cout <<"---------:\n";
-    std::cout << std::setw( PWIDTH_L ) << "TEI [s]:" <<std::setw( PWIDTH_R )<<ints_end - ints_start<< " s \n";
-    std::cout << std::setw( PWIDTH_L ) << "SCF [s]:" <<std::setw( PWIDTH_R )<<scf_end-scf_start<< " s \n";
-    std::cout << std::setw( PWIDTH_L ) << "4-index [s]:" <<std::setw( PWIDTH_R )<<trafo_end-trafo_start<< " s \n";
-    std::cout << std::setw( PWIDTH_L ) << "ri-4ind [s]:" <<std::setw( PWIDTH_R )<<ritrafo_end-ritrafo_start<< " s \n";
-    std::cout << std::setw( PWIDTH_L ) << "RI-MP2 [s]:" <<std::setw( PWIDTH_R )<<rimp2_end-rimp2_start<< " s \n";
-    std::cout << std::setw( PWIDTH_L ) << "MP2 [s]:" <<std::setw( PWIDTH_R )<<mp2_end-mp2_start<< " s \n";
+    std::cout <<"--------\n";
+   // std::cout << std::setw( PWIDTH_L ) << "TEI [s]:" <<std::setw( PWIDTH_R )<<ints_end - ints_start<< " s \n";
+   // std::cout << std::setw( PWIDTH_L ) << "SCF [s]:" <<std::setw( PWIDTH_R )<<scf_end-scf_start<< " s \n";
+   // std::cout << std::setw( PWIDTH_L ) << "4-index [s]:" <<std::setw( PWIDTH_R )<<trafo_end-trafo_start<< " s \n";
+   // std::cout << std::setw( PWIDTH_L ) << "ri-4ind [s]:" <<std::setw( PWIDTH_R )<<ritrafo_end-ritrafo_start<< " s \n";
+   // std::cout << std::setw( PWIDTH_L ) << "RI-MP2 [s]:" <<std::setw( PWIDTH_R )<<rimp2_end-rimp2_start<< " s \n";
+   // std::cout << std::setw( PWIDTH_L ) << "MP2 [s]:" <<std::setw( PWIDTH_R )<<mp2_end-mp2_start<< " s \n";
 
-    double total_end = omp_get_wtime();
+    timer["total"].second = omp_get_wtime();
     std::cout << "------------------------------" << '\n';
-    std::cout<< std::setw( PWIDTH_L ) << "Total [s]:"<<std::setw( PWIDTH_R )<<total_end-total_start<<" s \n";
+    std::cout<< std::setw( PWIDTH_L ) << "Total [s]:"<<std::setw( PWIDTH_R )<<timer["total"].second - timer["total"].first<<" s \n";
     std::cout << "\n\n--END--" << '\n';
     libint2::finalize();
     return 0;

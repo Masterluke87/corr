@@ -14,7 +14,6 @@
 #include <iomanip>
 #include "ops_io.h"
 
-using namespace std;
 
 //Extern Functions
 
@@ -25,7 +24,10 @@ using namespace std;
 /*                      STATUS                                                   */
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
-void print_header(){
+void print_header(int* nroe,int* nroa,int* nroao,int* naux_1,int* naux_2,long long int* nrofint,
+                  long long int* nrofaux,long long int* nrofaux2,
+                  double* coord,double* charges,double* zeff,
+                  std::string* basisNameOB,std::string* basisNameJK,std::string* basisNameRI){
   char str1[1024];
 
   size_t len = 1024;
@@ -33,12 +35,31 @@ void print_header(){
   time(&curr_time);
 
   gethostname(str1, len);
-  cout << "++++++++++++++++++++++++++++++++++++++\n";
-  cout << "+A PSI4/MPI/OPENMP/CUDA - MP2 PROGRAM+\n";
-  cout << "++++++++++++++++++++++++++++++++++++++\n";
+  std::cout << "++++++++++++++++++++++++++++++++++++++\n";
+  std::cout << "+A PSI4/MPI/OPENMP/CUDA - MP2 PROGRAM+\n";
+  std::cout << "++++++++++++++++++++++++++++++++++++++\n";
 
-  cout << "Host: " << str1 << "\nDate: " << ctime(&curr_time);
-  cout.flush();
+  std::cout << "Host: " << str1 << "\nDate: " << ctime(&curr_time);
+  std::cout << "\nSYSTEMDATA" << '\n';
+  std::cout << "----------" << "\n\n";
+  std::cout<<std::setw(-2)<<"Z" <<std::setw(10)<<"zeff"<<std::setw(10)<<"x" <<std::setw(10) << "y" <<std::setw(10)<< "z" <<'\n';
+  for (size_t i = 0; i < *nroa; i++) {
+        std::cout<<std::setw(-2)<<charges[i]<<std::setw(10)<<zeff[i]<<std::setw(10)<< coord[i*3+0]<<std::setw(10) << coord[i*3+1]<<std::setw(10)<< coord[i*3+2]<<'\n';
+  }
+
+  std::cout << "nroe          :" << *nroe<<'\n';
+  std::cout << "nroa          :" << *nroa<<'\n';
+  std::cout << "nroao         :" << *nroao<<'\n';
+  std::cout << "naux-JK       :" << *naux_1<<'\n';
+  std::cout << "naux-RI       :" << *naux_2<<'\n';
+  std::cout << "nrofint       :" << *nrofint<<'\n';
+  std::cout << "nrofaux(JK)   :" << *nrofaux<<'\n';
+  std::cout << "nrofaux(RI)   :" << *nrofaux2<< '\n';
+  std::cout << "basisName(OB) :" << *basisNameOB<<'\n';
+  std::cout << "basisName(JK) :" << *basisNameJK<<'\n';
+  std::cout << "basisName(RI) :" << *basisNameRI<<'\n';
+
+  std::cout.flush();
 }
 
 void read_system(std::string filename,int* nroe,int* nroa,
@@ -112,7 +133,7 @@ int rem_com(char* filename, char* streamstring, int string_length){
   int pos = 0;
   char cc;
 
-  ifstream inf(filename);
+  std::ifstream inf(filename);
 
   while(inf.get(cc)&& pos < string_length-1){
     if(cc != com_B)
@@ -124,7 +145,7 @@ int rem_com(char* filename, char* streamstring, int string_length){
   }
   streamstring[pos] = 0;
   if(pos == string_length-1){
-    cerr << "Buffer size exceeded !\n"; exit(0);
+    std::cerr << "Buffer size exceeded !\n"; exit(0);
   }
   return(strlen(streamstring));
 }
@@ -167,7 +188,7 @@ void read_input(std::ifstream* inputfile)
 
 void get_sys_size(std::string sysfile,int* nroe, int* nroao, int* nroa, long long int* nrofint,char* basisName){
 
-  ifstream inf(sysfile.c_str());
+  std::ifstream inf(sysfile.c_str());
 
   inf.read((char *) nroe,    sizeof(int));
   inf.read((char *) nroao,   sizeof(int));
@@ -202,7 +223,7 @@ void read_sys(std::string sysfile, double* coord, double* charges, double* mass,
 	      double* Hmat, double* Tmat, double* Smat,  double* Dx, double* Dy,
 	      double *Dz, long long int* sortcount, double* intval,
 	      unsigned short* intnums){
-  ifstream datf(sysfile.c_str());
+  std::ifstream datf(sysfile.c_str());
 
   int nroao, nroa, nroe;
   long long int nrofint;
@@ -243,7 +264,7 @@ void read_sys(std::string sysfile, double* coord, double* charges, double* mass,
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
 void write_wav_HF(std::string wavfile, int nroao, double* MOens, double* MOs){
-  ofstream outf(wavfile.c_str());
+  std::ofstream outf(wavfile.c_str());
   outf.write((char *) &nroao, sizeof(int));
   outf.write((char *) MOens,  sizeof(double)*nroao);
   outf.write((char *) MOs,    sizeof(double)*nroao*nroao);
@@ -261,12 +282,12 @@ void write_wav_HF(std::string wavfile, int nroao, double* MOens, double* MOs){
 
 
 void read_wav_HF(std::string wavfile, int nroao, double* MOens, double* MOs){
-  ifstream inf(wavfile.c_str());
+  std::ifstream inf(wavfile.c_str());
   int real_nroao;
 
   inf.read((char *) &real_nroao, sizeof(int));
   if(real_nroao != nroao){
-    cerr << "Wrong HF wavefunction size in read_wav_HF!\n"; exit(3);
+    std::cerr << "Wrong HF wavefunction size in read_wav_HF!\n"; exit(3);
   }
 
   //DEBUG 04052012TK
@@ -285,7 +306,7 @@ void read_wav_HF(std::string wavfile, int nroao, double* MOens, double* MOs){
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
 
-void   output_matrix(double* mat,int nr_of_col, int nrop, ofstream *outf){
+void   output_matrix(double* mat,int nr_of_col, int nrop, std::ofstream *outf){
   char dumchar[64];
   int nr_of_blocks = (int) ceil((double)nrop/(double)nr_of_col);
   for(int l = 0; l <  nr_of_blocks; l++){
