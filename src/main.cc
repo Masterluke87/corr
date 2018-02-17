@@ -231,7 +231,65 @@ int main(int argc, char const *argv[]) {
 
 
 
+    /* What the fuck!! do we need ?
+     * FOCK Matrix in spin-orbital basis
+     * t1 - amplides
+     * t2 - amplitudes
+     * eri tensor in spin orbital basis
 
+    /* f^{k}_{c} t^{c}_{k} +
+     *\frac{t^{c}_{l} t^{d}_{k}}{2} v^{kl}_{dc} +
+     *\frac{t^{dc}_{kl} v^{kl}_{dc}}{4}
+
+
+    /*
+    - f^{k}_{c} t^{c}_{i} t^{a}_{k} +
+    f^{k}_{c} t^{ac}_{ik} -
+    f^{k}_{i} t^{a}_{k} +
+    f^{a}_{c} t^{c}_{i} +
+    f^{a}_{i} +
+    t^{c}_{k} t^{d}_{i} t^{a}_{l} v^{kl}_{dc} +
+    t^{c}_{k} t^{d}_{i} v^{ak}_{dc} +
+    t^{c}_{k} t^{a}_{l} v^{kl}_{ic} -
+    t^{c}_{k} t^{ad}_{il} v^{kl}_{dc} +
+    t^{c}_{k} v^{ak}_{ic} +
+    \frac{t^{c}_{i} t^{ad}_{kl}}{2} v^{kl}_{dc} +
+    \frac{t^{a}_{l} t^{dc}_{ik}}{2} v^{kl}_{dc} +
+    \frac{t^{dc}_{ik} v^{ak}_{dc}}{2} -
+    \frac{t^{ac}_{kl} v^{kl}_{ic}}{2}
+    */
+    /*
+     * f^{k}_{c} t^{c}_{i} t^{ab}_{jk} P(ij) -
+     * f^{k}_{c} t^{a}_{k} t^{bc}_{ji} P(ab) +
+     * f^{k}_{i} t^{ab}_{jk} P(ij) +
+     * f^{a}_{c} t^{bc}_{ji} P(ab) -
+     * t^{c}_{k} t^{d}_{i} t^{ab}_{jl} v^{kl}_{dc} P(ij) +
+     * t^{c}_{k} t^{a}_{l} t^{bd}_{ji} v^{kl}_{dc} P(ab) -
+     * t^{c}_{k} t^{ad}_{ji} v^{bk}_{dc} P(ab) +
+     * t^{c}_{k} t^{ab}_{il} v^{kl}_{jc} P(ij) -
+     * t^{c}_{i} t^{d}_{j} t^{a}_{k} t^{b}_{l} v^{kl}_{dc} -
+     * t^{c}_{i} t^{d}_{j} t^{a}_{k} v^{bk}_{dc} P(ab) -
+     * \frac{t^{c}_{i} t^{d}_{j}}{2} t^{ab}_{kl} v^{kl}_{dc} -
+     * t^{c}_{i} t^{d}_{j} v^{ab}_{dc} -
+     * t^{c}_{i} t^{a}_{k} t^{b}_{l} v^{kl}_{jc} P(ij) +
+     * t^{c}_{i} t^{a}_{k} t^{bd}_{jl} v^{kl}_{dc} P(ab) P(ij) -
+     * t^{c}_{i} t^{a}_{k} v^{bk}_{jc} P(ab) P(ij) +
+     * t^{c}_{i} t^{ad}_{jk} v^{bk}_{dc} P(ab) P(ij) -
+     * \frac{t^{c}_{i} t^{ab}_{kl}}{2} v^{kl}_{jc} P(ij) -
+     * t^{c}_{i} v^{ab}_{jc} P(ij) -
+     * \frac{t^{a}_{k} t^{b}_{l}}{2} t^{dc}_{ji} v^{kl}_{dc} -
+     * t^{a}_{k} t^{b}_{l} v^{kl}_{ji} -
+     * \frac{t^{a}_{k} t^{dc}_{ji}}{2} v^{bk}_{dc} P(ab) +
+     * t^{a}_{k} t^{bc}_{il} v^{kl}_{jc} P(ab) P(ij) -
+     * t^{a}_{k} v^{bk}_{ji} P(ab) +
+     * \frac{t^{dc}_{jk} t^{ab}_{il}}{2} v^{kl}_{dc} P(ij) -
+     * \frac{t^{dc}_{ji} t^{ab}_{kl}}{4} v^{kl}_{dc} -
+     * \frac{t^{dc}_{ji} v^{ab}_{dc}}{2} -
+     * t^{ac}_{ik} t^{bd}_{jl} v^{kl}_{dc} P(ab) +
+     * t^{ac}_{ik} v^{bk}_{jc} P(ab) P(ij) -
+     * \frac{t^{ac}_{ji} t^{bd}_{kl}}{2} v^{kl}_{dc} P(ab) -
+     * \frac{t^{ab}_{kl} v^{kl}_{ji}}{2} - v^{ab}_{ji}
+     */
     /* Part 5
      * Print timings
      */
