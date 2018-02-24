@@ -22,6 +22,10 @@
 #define PWIDTH_R 16
 
 
+double get_integral(double* ints,long long int &istep,long long int &jstep,long long int &kstep,int  &i,int  &j,int &k,int &l){
+    return ints[(i/2)*istep + (k/2)*jstep + (j/2)*kstep + l/2]*(i%2==k%2)*(j%2==l%2) -
+           ints[(i/2)*istep + (l/2)*jstep + (j/2)*kstep + k/2]*(i%2==l%2)*(j%2==k%2);
+}
 
 int main(int argc, char const *argv[]) {
     int worldsize = 1;
@@ -29,7 +33,7 @@ int main(int argc, char const *argv[]) {
 
     /*
      *
-      Part 1 : Initialization
+       Part 1 : Initialization
      *
      */
 
@@ -194,10 +198,9 @@ int main(int argc, char const *argv[]) {
 
     double* FMo  = new double[nroao*nroao];
     build_FMo(nroao,Fmat,FMo,MOs);
-
-
+    double* prec_ints;
     {
-        double* prec_ints;
+
         double trafo_start = omp_get_wtime();
         MOtrans(MOs,nroao,nroe,nrofint,sortcount,intval,intnums,&prec_ints);
         double trafo_end = omp_get_wtime();
@@ -236,28 +239,844 @@ int main(int argc, char const *argv[]) {
      * t1 - amplides
      * t2 - amplitudes
      * eri tensor in spin orbital basis
+     */
 
-    /* f^{k}_{c} t^{c}_{k} +
-     *\frac{t^{c}_{l} t^{d}_{k}}{2} v^{kl}_{dc} +
-     *\frac{t^{dc}_{kl} v^{kl}_{dc}}{4}
+
+    std::cout<<"nel:"<<nroe<<std::endl;
+    std::cout<<"nocc:"<<nroe<<std::endl;
+    std::cout<<"nvir:"<<(2*nroao - nroe)<<std::endl;
+    std::cout<<"nroao:"<<nroao<<std::endl;
+    std::cout<<"nob:"<<2*nroao<<std::endl;
+    std::cout<<"nalpha:"<<nroao<<std::endl;
+    std::cout<<"nbeta:"<<nroao<<std::endl;
+
+
+    int nocc = nroe;
+    int nvir = (2*nroao - nroe);
+    int norb = 2*nroao;
+
+
+
+    double* f    = new double[norb*norb];
+    double* h_so = new double[norb*norb];
+    memset(h_so,0,norb*norb*sizeof(double));
+    memset(f,0,norb*norb*sizeof(double));
+
+    double twoe = 0.0;
+    long long int kstep = nroao;
+    long long int jstep = nroao*kstep;
+    long long int istep = nroao*jstep;
+
+    for(int i=0; i<norb; i++)
+        for(int j=0; j<norb; j++)
+            for(int mu=0; mu<nroao; mu++)
+                for(int nu=0; nu<nroao; nu++) {
+                    h_so[i*norb+j] += MOs[(i/2)*nroao +mu]*Hmat[mu*nroao + nu]*MOs[(j/2)*nroao +nu];
+                }
+
+
+
+    for(int i=0; i<norb; i++)
+        for(int a=0; a<norb; a++)
+        {
+            twoe=0.0;
+            for(int j=0; j<nocc; j++)
+                twoe += prec_ints[(i/2)*istep + (a/2)*jstep + (j/2)*kstep + (j/2)]*(i%2==a%2) - prec_ints[(i/2)*istep + (j/2)*jstep + (a/2)*kstep + (j/2)]*(i%2==j%2)*(a%2==j%2);
+            f[i*norb+a] = h_so[i*norb+a] + twoe;
+        }
+    double Eel = 0.0;
+    twoe = 0.0;
+    for(int i=0; i<nocc; i++) {
+        for(int j=0; j<nocc; j++)
+            twoe += prec_ints[(i/2)*istep + (i/2)*jstep + (j/2)*kstep + (j/2)] - prec_ints[(i/2)*istep + (j/2)*jstep + (i/2)*kstep + (j/2)]*(i%2==j%2);
+        Eel += h_so[i*norb+i];
+    }
+    Eel+=0.5*twoe;
+    double onee = 0.0;
+    double fsum = 0.0;
+    for(int i=0; i<nocc; i++) {
+        onee += h_so[i*norb+i];
+        fsum += f[i*norb+i];
+    }
+    std::cout<<"El:"<<Eel+ion_rep<<std::endl;
+    std::cout<<"one:"<<onee+ion_rep<<std::endl;
+    std::cout<<"fsum-0.5twoe:"<<fsum-(0.5*twoe)+ion_rep;
+
+
+
+    std::cout<<"\nGenerating Guess!";
+
+    double* T2    = new double[nocc*nocc*nvir*nvir];
+    double* T2n    = new double[nocc*nocc*nvir*nvir];
+    double* T1    = new double[nocc*nvir];
+    double* T1n    = new double[nocc*nvir];
+
+    memset(T1,0,nocc*nvir*sizeof(double));
+    memset(T1n,0,nocc*nvir*sizeof(double));
+    memset(T2n,0,nocc*nocc*nvir*nvir*sizeof(double));
+
+    int Ti,Tj,Ta,Tb = 0;
+    int Ta_step = nvir;
+    int Tj_step = Ta_step * nvir;
+    int Ti_step = Tj_step * nocc;
+
+    for (Ti = 0; Ti < nocc; Ti++) {
+        for (Tj = 0; Tj < nocc; Tj++) {
+            for (Ta = 0; Ta < nvir; Ta++) {
+                for (Tb = 0; Tb < nvir; Tb++) {
+                    T2[Ti*Ti_step + Tj*Tj_step + Ta*Ta_step + Tb] =( prec_ints[(Ti/2)*istep + (Ta+nocc)/2*jstep + (Tj/2)*kstep + (Tb+nocc)/2]*(Ti%2==Ta%2)*(Tj%2==Tb%2) -
+                                                                     prec_ints[(Ti/2)*istep + (Tb+nocc)/2*jstep + (Tj/2)*kstep + (Ta+nocc)/2]*(Ti%2==Tb%2)*(Tj%2==Ta%2)   )/
+                                                                    (f[(Ti)*norb + Ti] + f[Tj*norb + Tj] - f[(Ta+nocc)*norb + (Ta+nocc)] - f[(Tb+nocc)*norb + (Tb+nocc)]);
+
+                }
+            }
+        }
+    }
+
+    double EMP2 = 0.0;
+    int tmpA = 0;
+    int tmpB = 0;
+
+    for (Ti = 0; Ti < nocc; Ti++) {
+        for (Tj = 0; Tj < nocc; Tj++) {
+            for (Ta = 0; Ta < nvir; Ta++) {
+                for (Tb = 0; Tb < nvir; Tb++) {
+                    tmpA=Ta+nocc;
+                    tmpB=Tb+nocc;
+                    EMP2 += ( prec_ints[(Ti/2)*istep + (Ta+nocc)/2*jstep + (Tj/2)*kstep + (Tb+nocc)/2]*(Ti%2==Ta%2)*(Tj%2==Tb%2) -
+                              prec_ints[(Ti/2)*istep + (Tb+nocc)/2*jstep + (Tj/2)*kstep + (Ta+nocc)/2]*(Ti%2==Tb%2)*(Tj%2==Ta%2)   ) *  T2[Ti*Ti_step + Tj*Tj_step + Ta*Ta_step + Tb];
+                }
+            }
+        }
+    }
+
+    std::cout<<"\nEMP2:"<<0.25*EMP2;
+
+    for (int iter=0; iter<10; iter++)
+    {
+
+        double Ecc = 0.0;
+        double sum = 0.0;
+        int tmpc = 0;
+        int tmpd = 0;
+        int tmpa = 0;
+        int tmpb = 0;
+        //f^{k}_{c} t^{c}_{k}
+        sum = 0.0;
+        for(int k=0; k < nocc; k++)
+            for(int c=0; c < nvir; c++)
+            {
+                tmpc=c+nocc;
+                sum+= f[k*norb + tmpc]*T1[k*nvir + c];
+            }
+        sum*= 1.0;
+        Ecc+=sum;
+
+        //\frac{t^{dc}_{kl} v^{kl}_{dc}}{4}
+        sum = 0.0;
+        for(int d=0; d < nvir; d++)
+            for(int c=0; c < nvir; c++)
+                for(int k=0; k < nocc; k++)
+                    for(int l=0; l < nocc; l++)
+                    {
+                        tmpd=d+nocc;
+                        tmpc=c+nocc;
+                        sum+= T2[k*Ti_step + l*Tj_step + d*Ta_step + c]*get_integral(prec_ints,istep,jstep,kstep,k,l,tmpd,tmpc);
+                    }
+        sum*= 0.250000000000000;
+        Ecc+=sum;
+
+        //\frac{t^{c}_{l} t^{d}_{k}}{2} v^{kl}_{dc}
+        sum = 0.0;
+        for(int c=0; c < nvir; c++)
+            for(int l=0; l < nocc; l++)
+                for(int d=0; d < nvir; d++)
+                    for(int k=0; k < nocc; k++)
+                    {
+                        tmpc=c+nocc;
+                        tmpd=d+nocc;
+                        sum+= T1[l*nvir + c]*T1[k*nvir + d]*get_integral(prec_ints,istep,jstep,kstep,k,l,tmpd,tmpc);
+                    }
+        sum*= 0.500000000000000;
+        Ecc+=sum;
+
+        std::cout<<"E(CCSD)="<<Ecc<<"\n";
+
+        for(int i=0; i<nocc; i++) {
+            for(int a=0; a<nvir; a++) {//f^{a}_{c} t^{c}_{i}
+                T1n[i*nvir + a] = 0.0;
+                sum = 0.0;
+                for(int c=0; c < nvir; c++)
+                {
+                    tmpa=a+nocc;
+                    tmpc=c+nocc;
+                    sum+= f[tmpa*norb + tmpc]*T1[i*nvir + c];
+                }
+                sum*= 1.0;
+                T1n[i*nvir + a]+=sum;
+
+                //f^{k}_{c} t^{ac}_{ik}
+                sum = 0.0;
+                for(int k=0; k < nocc; k++)
+                    for(int c=0; c < nvir; c++)
+                    {
+                        tmpc=c+nocc;
+                        tmpa=a+nocc;
+                        sum+= f[k*norb + tmpc]*T2[i*Ti_step + k*Tj_step + a*Ta_step + c];
+                    }
+                sum*= 1.0;
+                T1n[i*nvir + a]+=sum;
+
+                //t^{c}_{k} v^{ak}_{ic}
+                sum = 0.0;
+                for(int c=0; c < nvir; c++)
+                    for(int k=0; k < nocc; k++)
+                    {
+                        tmpc=c+nocc;
+                        tmpa=a+nocc;
+                        sum+= T1[k*nvir + c]*get_integral(prec_ints,istep,jstep,kstep,tmpa,k,i,tmpc);
+                    }
+                sum*= 1.0;
+                T1n[i*nvir + a]+=sum;
+
+                //\frac{t^{dc}_{ik} v^{ak}_{dc}}{2}
+                sum = 0.0;
+                for(int d=0; d < nvir; d++)
+                    for(int c=0; c < nvir; c++)
+                        for(int k=0; k < nocc; k++)
+                        {
+                            tmpd=d+nocc;
+                            tmpc=c+nocc;
+                            tmpa=a+nocc;
+                            sum+= T2[i*Ti_step + k*Tj_step + d*Ta_step + c]*get_integral(prec_ints,istep,jstep,kstep,tmpa,k,tmpd,tmpc);
+                        }
+                sum*= 0.500000000000000;
+                T1n[i*nvir + a]+=sum;
+
+                //- f^{k}_{i} t^{a}_{k}
+                sum = 0.0;
+                for(int k=0; k < nocc; k++)
+                {
+                    tmpa=a+nocc;
+                    sum+= f[k*norb + i]*T1[k*nvir + a];
+                }
+                sum*= -1.00000000000000;
+                T1n[i*nvir + a]+=sum;
+
+                //- \frac{t^{ac}_{kl} v^{kl}_{ic}}{2}
+                sum = 0.0;
+                for(int c=0; c < nvir; c++)
+                    for(int k=0; k < nocc; k++)
+                        for(int l=0; l < nocc; l++)
+                        {
+                            tmpa=a+nocc;
+                            tmpc=c+nocc;
+                            sum+= T2[k*Ti_step + l*Tj_step + a*Ta_step + c]*get_integral(prec_ints,istep,jstep,kstep,k,l,i,tmpc);
+                        }
+                sum*= -0.500000000000000;
+                T1n[i*nvir + a]+=sum;
+
+                //t^{c}_{k} t^{a}_{l} v^{kl}_{ic}
+                sum = 0.0;
+                for(int l=0; l < nocc; l++)
+                    for(int c=0; c < nvir; c++)
+                        for(int k=0; k < nocc; k++)
+                        {
+                            tmpa=a+nocc;
+                            tmpc=c+nocc;
+                            sum+= T1[l*nvir + a]*T1[k*nvir + c]*get_integral(prec_ints,istep,jstep,kstep,k,l,i,tmpc);
+                        }
+                sum*= 1.0;
+                T1n[i*nvir + a]+=sum;
+
+                //t^{c}_{k} t^{d}_{i} v^{ak}_{dc}
+                sum = 0.0;
+                for(int c=0; c < nvir; c++)
+                    for(int k=0; k < nocc; k++)
+                        for(int d=0; d < nvir; d++)
+                        {
+                            tmpc=c+nocc;
+                            tmpd=d+nocc;
+                            tmpa=a+nocc;
+                            sum+= T1[k*nvir + c]*T1[i*nvir + d]*get_integral(prec_ints,istep,jstep,kstep,tmpa,k,tmpd,tmpc);
+                        }
+                sum*= 1.0;
+                T1n[i*nvir + a]+=sum;
+
+                //\frac{t^{a}_{l} t^{dc}_{ik}}{2} v^{kl}_{dc}
+                sum = 0.0;
+                for(int l=0; l < nocc; l++)
+                    for(int d=0; d < nvir; d++)
+                        for(int c=0; c < nvir; c++)
+                            for(int k=0; k < nocc; k++)
+                            {
+                                tmpa=a+nocc;
+                                tmpd=d+nocc;
+                                tmpc=c+nocc;
+                                sum+= T1[l*nvir + a]*T2[i*Ti_step + k*Tj_step + d*Ta_step + c]*get_integral(prec_ints,istep,jstep,kstep,k,l,tmpd,tmpc);
+                            }
+                sum*= 0.500000000000000;
+                T1n[i*nvir + a]+=sum;
+
+                //\frac{t^{c}_{i} t^{ad}_{kl}}{2} v^{kl}_{dc}
+                sum = 0.0;
+                for(int c=0; c < nvir; c++)
+                    for(int d=0; d < nvir; d++)
+                        for(int k=0; k < nocc; k++)
+                            for(int l=0; l < nocc; l++)
+                            {
+                                tmpc=c+nocc;
+                                tmpa=a+nocc;
+                                tmpd=d+nocc;
+                                sum+= T1[i*nvir + c]*T2[k*Ti_step + l*Tj_step + a*Ta_step + d]*get_integral(prec_ints,istep,jstep,kstep,k,l,tmpd,tmpc);
+                            }
+                sum*= 0.500000000000000;
+                T1n[i*nvir + a]+=sum;
+
+                //- f^{k}_{c} t^{c}_{i} t^{a}_{k}
+                sum = 0.0;
+                for(int k=0; k < nocc; k++)
+                    for(int c=0; c < nvir; c++)
+                    {
+                        tmpc=c+nocc;
+                        tmpa=a+nocc;
+                        sum+= f[k*norb + tmpc]*T1[k*nvir + a]*T1[i*nvir + c];
+                    }
+                sum*= -1.00000000000000;
+                T1n[i*nvir + a]+=sum;
+
+                //- t^{c}_{k} t^{ad}_{il} v^{kl}_{dc}
+                sum = 0.0;
+                for(int c=0; c < nvir; c++)
+                    for(int k=0; k < nocc; k++)
+                        for(int d=0; d < nvir; d++)
+                            for(int l=0; l < nocc; l++)
+                            {
+                                tmpc=c+nocc;
+                                tmpa=a+nocc;
+                                tmpd=d+nocc;
+                                sum+= T1[k*nvir + c]*T2[i*Ti_step + l*Tj_step + a*Ta_step + d]*get_integral(prec_ints,istep,jstep,kstep,k,l,tmpd,tmpc);
+                            }
+                sum*= -1.00000000000000;
+                T1n[i*nvir + a]+=sum;
+
+                //t^{c}_{k} t^{d}_{i} t^{a}_{l} v^{kl}_{dc}
+                sum = 0.0;
+                for(int l=0; l < nocc; l++)
+                    for(int c=0; c < nvir; c++)
+                        for(int k=0; k < nocc; k++)
+                            for(int d=0; d < nvir; d++)
+                            {
+                                tmpa=a+nocc;
+                                tmpc=c+nocc;
+                                tmpd=d+nocc;
+                                sum+= T1[l*nvir + a]*T1[k*nvir + c]*T1[i*nvir + d]*get_integral(prec_ints,istep,jstep,kstep,k,l,tmpd,tmpc);
+                            }
+                sum*= 1.0;
+                T1n[i*nvir + a]+=sum;
+
+                //f^{a}_{i}
+                sum = 0.0;
+                {
+                    sum+= f[i*norb + nocc + a];
+                }
+                sum*= 1.0;
+
+                T1n[i*nvir + a]+=(sum -f[(a+nocc)*norb + nocc + a]*T1[i*nvir+a] +f[i*norb + i]*T1[i*nvir+a]);
+                T1n[i*nvir + a] =T1n[i*nvir + a]/(f[i*norb + i] - f[(a+nocc)*norb + (nocc +a)]);
+                //std::cout<<"T1:"<<"i:"<<i<<" a:"<<a<<" t1="<<T1n[i*nvir + a]<<"  fii="<<f[i*norb + i]<<"  faa="<<f[(a+nocc)*norb + (nocc +a)]<<"\n";
+
+            }
+          //  std::cout<<"T1:"<<i<<"\n";
+        }
+        for(int i =0; i<nocc; i++) {
+            for(int j =0; j<nocc; j++) {
+                for(int a =0; a<nvir; a++) {
+                    for(int b =0; b<nocc; b++)
+                    {//- v^{ab}_{ji}
+                        T2n[i*Ti_step + j*Tj_step +a*Ta_step + b]=0.0;
+                        sum = 0.0;
+                        {
+                            tmpa=a+nocc;
+                            tmpb=b+nocc;
+                            sum+= get_integral(prec_ints,istep,jstep,kstep,tmpa,tmpb,j,i);
+                        }
+                        sum*= -1.00000000000000;
+                        T2n[i*Ti_step + j*Tj_step +a*Ta_step + b]+=sum;
+
+                        //- \frac{t^{ab}_{kl} v^{kl}_{ji}}{2}
+                        sum = 0.0;
+                        for(int k=0; k < nocc; k++)
+                            for(int l=0; l < nocc; l++)
+                            {
+                                tmpa=a+nocc;
+                                tmpb=b+nocc;
+                                sum+= T2[k*Ti_step + l*Tj_step + a*Ta_step + b]*get_integral(prec_ints,istep,jstep,kstep,k,l,j,i);
+                            }
+                        sum*= -0.500000000000000;
+                        T2n[i*Ti_step + j*Tj_step +a*Ta_step + b]+=sum;
+
+                        //- \frac{t^{dc}_{ji} v^{ab}_{dc}}{2}
+                        sum = 0.0;
+                        for(int d=0; d < nvir; d++)
+                            for(int c=0; c < nvir; c++)
+                            {
+                                tmpd=d+nocc;
+                                tmpc=c+nocc;
+                                tmpa=a+nocc;
+                                tmpb=b+nocc;
+                                sum+= T2[j*Ti_step + i*Tj_step + d*Ta_step + c]*get_integral(prec_ints,istep,jstep,kstep,tmpa,tmpb,tmpd,tmpc);
+                            }
+                        sum*= -0.500000000000000;
+                        T2n[i*Ti_step + j*Tj_step +a*Ta_step + b]+=sum;
+
+                        //f^{a}_{c} t^{bc}_{ji} P(ab)
+                        sum = 0.0;
+                        for(int c=0; c < nvir; c++)
+                        {
+                            tmpa=a+nocc;
+                            tmpc=c+nocc;
+                            tmpb=b+nocc;
+                            sum+= f[tmpa*norb + tmpc]*T2[j*Ti_step + i*Tj_step + b*Ta_step + c];
+                        }
+                        sum*= 1.0;
+                        T2n[i*Ti_step + j*Tj_step +a*Ta_step + b]+=sum;
+
+                        //f^{k}_{i} t^{ab}_{jk} P(ij)
+                        sum = 0.0;
+                        for(int k=0; k < nocc; k++)
+                        {
+                            tmpa=a+nocc;
+                            tmpb=b+nocc;
+                            sum+= f[k*norb + i]*T2[j*Ti_step + k*Tj_step + a*Ta_step + b];
+                        }
+                        sum*= 1.0;
+                        T2n[i*Ti_step + j*Tj_step +a*Ta_step + b]+=sum;
+
+                        //- t^{a}_{k} t^{b}_{l} v^{kl}_{ji}
+                        sum = 0.0;
+                        for(int k=0; k < nocc; k++)
+                            for(int l=0; l < nocc; l++)
+                            {
+                                tmpa=a+nocc;
+                                tmpb=b+nocc;
+                                sum+= T1[k*nvir + a]*T1[l*nvir + b]*get_integral(prec_ints,istep,jstep,kstep,k,l,j,i);
+                            }
+                        sum*= -1.00000000000000;
+                        T2n[i*Ti_step + j*Tj_step +a*Ta_step + b]+=sum;
+
+                        //- t^{a}_{k} v^{bk}_{ji} P(ab)
+                        sum = 0.0;
+                        for(int k=0; k < nocc; k++)
+                        {
+                            tmpa=a+nocc;
+                            tmpb=b+nocc;
+                            sum+= T1[k*nvir + a]*get_integral(prec_ints,istep,jstep,kstep,tmpb,k,j,i);
+                        }
+                        sum*= -1.00000000000000;
+                        T2n[i*Ti_step + j*Tj_step +a*Ta_step + b]+=sum;
+
+                        //- t^{c}_{i} t^{d}_{j} v^{ab}_{dc}
+                        sum = 0.0;
+                        for(int c=0; c < nvir; c++)
+                            for(int d=0; d < nvir; d++)
+                            {
+                                tmpc=c+nocc;
+                                tmpd=d+nocc;
+                                tmpa=a+nocc;
+                                tmpb=b+nocc;
+                                sum+= T1[i*nvir + c]*T1[j*nvir + d]*get_integral(prec_ints,istep,jstep,kstep,tmpa,tmpb,tmpd,tmpc);
+                            }
+                        sum*= -1.00000000000000;
+                        T2n[i*Ti_step + j*Tj_step +a*Ta_step + b]+=sum;
+
+                        //- t^{c}_{i} v^{ab}_{jc} P(ij)
+                        sum = 0.0;
+                        for(int c=0; c < nvir; c++)
+                        {
+                            tmpc=c+nocc;
+                            tmpa=a+nocc;
+                            tmpb=b+nocc;
+                            sum+= T1[i*nvir + c]*get_integral(prec_ints,istep,jstep,kstep,tmpa,tmpb,j,tmpc);
+                        }
+                        sum*= -1.00000000000000;
+                        T2n[i*Ti_step + j*Tj_step +a*Ta_step + b]+=sum;
+
+                        //- \frac{t^{dc}_{ji} t^{ab}_{kl}}{4} v^{kl}_{dc}
+                        sum = 0.0;
+                        for(int k=0; k < nocc; k++)
+                            for(int l=0; l < nocc; l++)
+                                for(int d=0; d < nvir; d++)
+                                    for(int c=0; c < nvir; c++)
+                                    {
+                                        tmpa=a+nocc;
+                                        tmpb=b+nocc;
+                                        tmpd=d+nocc;
+                                        tmpc=c+nocc;
+                                        sum+= T2[k*Ti_step + l*Tj_step + a*Ta_step + b]*T2[j*Ti_step + i*Tj_step + d*Ta_step + c]*get_integral(prec_ints,istep,jstep,kstep,k,l,tmpd,tmpc);
+                                    }
+                        sum*= -0.250000000000000;
+                        T2n[i*Ti_step + j*Tj_step +a*Ta_step + b]+=sum;
+
+                        //f^{k}_{c} t^{c}_{i} t^{ab}_{jk} P(ij)
+                        sum = 0.0;
+                        for(int k=0; k < nocc; k++)
+                            for(int c=0; c < nvir; c++)
+                            {
+                                tmpc=c+nocc;
+                                tmpa=a+nocc;
+                                tmpb=b+nocc;
+                                sum+= f[k*norb + tmpc]*T1[i*nvir + c]*T2[j*Ti_step + k*Tj_step + a*Ta_step + b];
+                            }
+                        sum*= 1.0;
+                        T2n[i*Ti_step + j*Tj_step +a*Ta_step + b]+=sum;
+
+                        //t^{c}_{k} t^{ab}_{il} v^{kl}_{jc} P(ij)
+                        sum = 0.0;
+                        for(int c=0; c < nvir; c++)
+                            for(int k=0; k < nocc; k++)
+                                for(int l=0; l < nocc; l++)
+                                {
+                                    tmpc=c+nocc;
+                                    tmpa=a+nocc;
+                                    tmpb=b+nocc;
+                                    sum+= T1[k*nvir + c]*T2[i*Ti_step + l*Tj_step + a*Ta_step + b]*get_integral(prec_ints,istep,jstep,kstep,k,l,j,tmpc);
+                                }
+                        sum*= 1.0;
+                        T2n[i*Ti_step + j*Tj_step +a*Ta_step + b]+=sum;
+
+                        //t^{ac}_{ik} v^{bk}_{jc} P(ab) P(ij)
+                        sum = 0.0;
+                        for(int c=0; c < nvir; c++)
+                            for(int k=0; k < nocc; k++)
+                            {
+                                tmpa=a+nocc;
+                                tmpc=c+nocc;
+                                tmpb=b+nocc;
+                                sum+= T2[i*Ti_step + k*Tj_step + a*Ta_step + c]*get_integral(prec_ints,istep,jstep,kstep,tmpb,k,j,tmpc);
+                            }
+                        sum*= 1.0;
+                        T2n[i*Ti_step + j*Tj_step +a*Ta_step + b]+=sum;
+
+                        //t^{ac}_{jk} t^{bd}_{il} v^{kl}_{dc} P(ab)
+                        sum = 0.0;
+                        for(int c=0; c < nvir; c++)
+                            for(int k=0; k < nocc; k++)
+                                for(int d=0; d < nvir; d++)
+                                    for(int l=0; l < nocc; l++)
+                                    {
+                                        tmpa=a+nocc;
+                                        tmpc=c+nocc;
+                                        tmpb=b+nocc;
+                                        tmpd=d+nocc;
+                                        sum+= T2[j*Ti_step + k*Tj_step + a*Ta_step + c]*T2[i*Ti_step + l*Tj_step + b*Ta_step + d]*get_integral(prec_ints,istep,jstep,kstep,k,l,tmpd,tmpc);
+                                    }
+                        sum*= 1.0;
+                        T2n[i*Ti_step + j*Tj_step +a*Ta_step + b]+=sum;
+
+                        //\frac{t^{dc}_{jk} t^{ab}_{il}}{2} v^{kl}_{dc} P(ij)
+                        sum = 0.0;
+                        for(int l=0; l < nocc; l++)
+                            for(int d=0; d < nvir; d++)
+                                for(int c=0; c < nvir; c++)
+                                    for(int k=0; k < nocc; k++)
+                                    {
+                                        tmpa=a+nocc;
+                                        tmpb=b+nocc;
+                                        tmpd=d+nocc;
+                                        tmpc=c+nocc;
+                                        sum+= T2[i*Ti_step + l*Tj_step + a*Ta_step + b]*T2[j*Ti_step + k*Tj_step + d*Ta_step + c]*get_integral(prec_ints,istep,jstep,kstep,k,l,tmpd,tmpc);
+                                    }
+                        sum*= 0.500000000000000;
+                        T2n[i*Ti_step + j*Tj_step +a*Ta_step + b]+=sum;
+
+                        //- f^{k}_{c} t^{a}_{k} t^{bc}_{ji} P(ab)
+                        sum = 0.0;
+                        for(int k=0; k < nocc; k++)
+                            for(int c=0; c < nvir; c++)
+                            {
+                                tmpc=c+nocc;
+                                tmpa=a+nocc;
+                                tmpb=b+nocc;
+                                sum+= f[k*norb + tmpc]*T1[k*nvir + a]*T2[j*Ti_step + i*Tj_step + b*Ta_step + c];
+                            }
+                        sum*= -1.00000000000000;
+                        T2n[i*Ti_step + j*Tj_step +a*Ta_step + b]+=sum;
+
+                        //- t^{c}_{k} t^{ad}_{ji} v^{bk}_{dc} P(ab)
+                        sum = 0.0;
+                        for(int c=0; c < nvir; c++)
+                            for(int k=0; k < nocc; k++)
+                                for(int d=0; d < nvir; d++)
+                                {
+                                    tmpc=c+nocc;
+                                    tmpa=a+nocc;
+                                    tmpd=d+nocc;
+                                    tmpb=b+nocc;
+                                    sum+= T1[k*nvir + c]*T2[j*Ti_step + i*Tj_step + a*Ta_step + d]*get_integral(prec_ints,istep,jstep,kstep,tmpb,k,tmpd,tmpc);
+                                }
+                        sum*= -1.00000000000000;
+                        T2n[i*Ti_step + j*Tj_step +a*Ta_step + b]+=sum;
+
+                        //- \frac{t^{a}_{k} t^{b}_{l}}{2} t^{dc}_{ji} v^{kl}_{dc}
+                        sum = 0.0;
+                        for(int k=0; k < nocc; k++)
+                            for(int l=0; l < nocc; l++)
+                                for(int d=0; d < nvir; d++)
+                                    for(int c=0; c < nvir; c++)
+                                    {
+                                        tmpa=a+nocc;
+                                        tmpb=b+nocc;
+                                        tmpd=d+nocc;
+                                        tmpc=c+nocc;
+                                        sum+= T1[k*nvir + a]*T1[l*nvir + b]*T2[j*Ti_step + i*Tj_step + d*Ta_step + c]*get_integral(prec_ints,istep,jstep,kstep,k,l,tmpd,tmpc);
+                                    }
+                        sum*= -0.500000000000000;
+                        T2n[i*Ti_step + j*Tj_step +a*Ta_step + b]+=sum;
+
+                        //- \frac{t^{a}_{k} t^{dc}_{ji}}{2} v^{bk}_{dc} P(ab)
+                        sum = 0.0;
+                        for(int k=0; k < nocc; k++)
+                            for(int d=0; d < nvir; d++)
+                                for(int c=0; c < nvir; c++)
+                                {
+                                    tmpa=a+nocc;
+                                    tmpd=d+nocc;
+                                    tmpc=c+nocc;
+                                    tmpb=b+nocc;
+                                    sum+= T1[k*nvir + a]*T2[j*Ti_step + i*Tj_step + d*Ta_step + c]*get_integral(prec_ints,istep,jstep,kstep,tmpb,k,tmpd,tmpc);
+                                }
+                        sum*= -0.500000000000000;
+                        T2n[i*Ti_step + j*Tj_step +a*Ta_step + b]+=sum;
+
+                        //- \frac{t^{c}_{i} t^{d}_{j}}{2} t^{ab}_{kl} v^{kl}_{dc}
+                        sum = 0.0;
+                        for(int c=0; c < nvir; c++)
+                            for(int d=0; d < nvir; d++)
+                                for(int k=0; k < nocc; k++)
+                                    for(int l=0; l < nocc; l++)
+                                    {
+                                        tmpc=c+nocc;
+                                        tmpd=d+nocc;
+                                        tmpa=a+nocc;
+                                        tmpb=b+nocc;
+                                        sum+= T1[i*nvir + c]*T1[j*nvir + d]*T2[k*Ti_step + l*Tj_step + a*Ta_step + b]*get_integral(prec_ints,istep,jstep,kstep,k,l,tmpd,tmpc);
+                                    }
+                        sum*= -0.500000000000000;
+                        T2n[i*Ti_step + j*Tj_step +a*Ta_step + b]+=sum;
+
+                        //- \frac{t^{c}_{i} t^{ab}_{kl}}{2} v^{kl}_{jc} P(ij)
+                        sum = 0.0;
+                        for(int c=0; c < nvir; c++)
+                            for(int k=0; k < nocc; k++)
+                                for(int l=0; l < nocc; l++)
+                                {
+                                    tmpc=c+nocc;
+                                    tmpa=a+nocc;
+                                    tmpb=b+nocc;
+                                    sum+= T1[i*nvir + c]*T2[k*Ti_step + l*Tj_step + a*Ta_step + b]*get_integral(prec_ints,istep,jstep,kstep,k,l,j,tmpc);
+                                }
+                        sum*= -0.500000000000000;
+                        T2n[i*Ti_step + j*Tj_step +a*Ta_step + b]+=sum;
+
+                        //- \frac{t^{ac}_{kl} t^{bd}_{ji}}{2} v^{kl}_{dc} P(ab)
+                        sum = 0.0;
+                        for(int c=0; c < nvir; c++)
+                            for(int k=0; k < nocc; k++)
+                                for(int l=0; l < nocc; l++)
+                                    for(int d=0; d < nvir; d++)
+                                    {
+                                        tmpa=a+nocc;
+                                        tmpc=c+nocc;
+                                        tmpb=b+nocc;
+                                        tmpd=d+nocc;
+                                        sum+= T2[k*Ti_step + l*Tj_step + a*Ta_step + c]*T2[j*Ti_step + i*Tj_step + b*Ta_step + d]*get_integral(prec_ints,istep,jstep,kstep,k,l,tmpd,tmpc);
+                                    }
+                        sum*= -0.500000000000000;
+                        T2n[i*Ti_step + j*Tj_step +a*Ta_step + b]+=sum;
+
+                        //t^{a}_{k} t^{bc}_{il} v^{kl}_{jc} P(ab) P(ij)
+                        sum = 0.0;
+                        for(int k=0; k < nocc; k++)
+                            for(int c=0; c < nvir; c++)
+                                for(int l=0; l < nocc; l++)
+                                {
+                                    tmpa=a+nocc;
+                                    tmpb=b+nocc;
+                                    tmpc=c+nocc;
+                                    sum+= T1[k*nvir + a]*T2[i*Ti_step + l*Tj_step + b*Ta_step + c]*get_integral(prec_ints,istep,jstep,kstep,k,l,j,tmpc);
+                                }
+                        sum*= 1.0;
+                        T2n[i*Ti_step + j*Tj_step +a*Ta_step + b]+=sum;
+
+                        //t^{c}_{k} t^{a}_{l} t^{bd}_{ji} v^{kl}_{dc} P(ab)
+                        sum = 0.0;
+                        for(int l=0; l < nocc; l++)
+                            for(int c=0; c < nvir; c++)
+                                for(int k=0; k < nocc; k++)
+                                    for(int d=0; d < nvir; d++)
+                                    {
+                                        tmpa=a+nocc;
+                                        tmpc=c+nocc;
+                                        tmpb=b+nocc;
+                                        tmpd=d+nocc;
+                                        sum+= T1[l*nvir + a]*T1[k*nvir + c]*T2[j*Ti_step + i*Tj_step + b*Ta_step + d]*get_integral(prec_ints,istep,jstep,kstep,k,l,tmpd,tmpc);
+                                    }
+                        sum*= 1.0;
+                        T2n[i*Ti_step + j*Tj_step +a*Ta_step + b]+=sum;
+
+                        //t^{c}_{i} t^{ad}_{jk} v^{bk}_{dc} P(ab) P(ij)
+                        sum = 0.0;
+                        for(int c=0; c < nvir; c++)
+                            for(int d=0; d < nvir; d++)
+                                for(int k=0; k < nocc; k++)
+                                {
+                                    tmpc=c+nocc;
+                                    tmpa=a+nocc;
+                                    tmpd=d+nocc;
+                                    tmpb=b+nocc;
+                                    sum+= T1[i*nvir + c]*T2[j*Ti_step + k*Tj_step + a*Ta_step + d]*get_integral(prec_ints,istep,jstep,kstep,tmpb,k,tmpd,tmpc);
+                                }
+                        sum*= 1.0;
+                        T2n[i*Ti_step + j*Tj_step +a*Ta_step + b]+=sum;
+
+                        //- t^{c}_{i} t^{d}_{j} t^{a}_{k} t^{b}_{l} v^{kl}_{dc}
+                        sum = 0.0;
+                        for(int k=0; k < nocc; k++)
+                            for(int l=0; l < nocc; l++)
+                                for(int c=0; c < nvir; c++)
+                                    for(int d=0; d < nvir; d++)
+                                    {
+                                        tmpa=a+nocc;
+                                        tmpb=b+nocc;
+                                        tmpc=c+nocc;
+                                        tmpd=d+nocc;
+                                        sum+= T1[k*nvir + a]*T1[l*nvir + b]*T1[i*nvir + c]*T1[j*nvir + d]*get_integral(prec_ints,istep,jstep,kstep,k,l,tmpd,tmpc);
+                                    }
+                        sum*= -1.00000000000000;
+                        T2n[i*Ti_step + j*Tj_step +a*Ta_step + b]+=sum;
+
+                        //- t^{c}_{i} t^{a}_{k} t^{b}_{l} v^{kl}_{jc} P(ij)
+                        sum = 0.0;
+                        for(int k=0; k < nocc; k++)
+                            for(int l=0; l < nocc; l++)
+                                for(int c=0; c < nvir; c++)
+                                {
+                                    tmpa=a+nocc;
+                                    tmpb=b+nocc;
+                                    tmpc=c+nocc;
+                                    sum+= T1[k*nvir + a]*T1[l*nvir + b]*T1[i*nvir + c]*get_integral(prec_ints,istep,jstep,kstep,k,l,j,tmpc);
+                                }
+                        sum*= -1.00000000000000;
+                        T2n[i*Ti_step + j*Tj_step +a*Ta_step + b]+=sum;
+
+                        //- t^{c}_{i} t^{d}_{j} t^{a}_{k} v^{bk}_{dc} P(ab)
+                        sum = 0.0;
+                        for(int k=0; k < nocc; k++)
+                            for(int c=0; c < nvir; c++)
+                                for(int d=0; d < nvir; d++)
+                                {
+                                    tmpa=a+nocc;
+                                    tmpc=c+nocc;
+                                    tmpd=d+nocc;
+                                    tmpb=b+nocc;
+                                    sum+= T1[k*nvir + a]*T1[i*nvir + c]*T1[j*nvir + d]*get_integral(prec_ints,istep,jstep,kstep,tmpb,k,tmpd,tmpc);
+                                }
+                        sum*= -1.00000000000000;
+                        T2n[i*Ti_step + j*Tj_step +a*Ta_step + b]+=sum;
+
+                        //- t^{c}_{i} t^{a}_{k} v^{bk}_{jc} P(ab) P(ij)
+                        sum = 0.0;
+                        for(int k=0; k < nocc; k++)
+                            for(int c=0; c < nvir; c++)
+                            {
+                                tmpa=a+nocc;
+                                tmpc=c+nocc;
+                                tmpb=b+nocc;
+                                sum+= T1[k*nvir + a]*T1[i*nvir + c]*get_integral(prec_ints,istep,jstep,kstep,tmpb,k,j,tmpc);
+                            }
+                        sum*= -1.00000000000000;
+                        T2n[i*Ti_step + j*Tj_step +a*Ta_step + b]+=sum;
+
+                        //- t^{c}_{k} t^{d}_{i} t^{ab}_{jl} v^{kl}_{dc} P(ij)
+                        sum = 0.0;
+                        for(int c=0; c < nvir; c++)
+                            for(int k=0; k < nocc; k++)
+                                for(int d=0; d < nvir; d++)
+                                    for(int l=0; l < nocc; l++)
+                                    {
+                                        tmpc=c+nocc;
+                                        tmpd=d+nocc;
+                                        tmpa=a+nocc;
+                                        tmpb=b+nocc;
+                                        sum+= T1[k*nvir + c]*T1[i*nvir + d]*T2[j*Ti_step + l*Tj_step + a*Ta_step + b]*get_integral(prec_ints,istep,jstep,kstep,k,l,tmpd,tmpc);
+                                    }
+                        sum*= -1.00000000000000;
+                        T2n[i*Ti_step + j*Tj_step +a*Ta_step + b]+=sum;
+
+                        //t^{c}_{i} t^{a}_{k} t^{bd}_{jl} v^{kl}_{dc} P(ab) P(ij)
+                        sum = 0.0;
+                        for(int k=0; k < nocc; k++)
+                            for(int c=0; c < nvir; c++)
+                                for(int d=0; d < nvir; d++)
+                                    for(int l=0; l < nocc; l++)
+                                    {
+                                        tmpa=a+nocc;
+                                        tmpc=c+nocc;
+                                        tmpb=b+nocc;
+                                        tmpd=d+nocc;
+                                        sum+= T1[k*nvir + a]*T1[i*nvir + c]*T2[j*Ti_step + l*Tj_step + b*Ta_step + d]*get_integral(prec_ints,istep,jstep,kstep,k,l,tmpd,tmpc);
+                                    }
+                        sum*= 1.0;
+                        T2n[i*Ti_step + j*Tj_step +a*Ta_step + b]+=(sum - f[(a+nocc)*norb +a+nocc]*T2[i*Ti_step + j*Tj_step + a*Ta_step + a]
+                                                                    - f[(b+nocc)*norb +b+nocc]*T2[i*Ti_step + j*Tj_step + b*Ta_step + b]
+                                                                    + f[       i*norb +i     ]*T2[i*Ti_step + i*Tj_step + a*Ta_step + b]
+                                                                    + f[       j*norb +j     ]*T2[j*Ti_step + j*Tj_step + a*Ta_step + b]);
+
+                        T2n[i*Ti_step + j*Tj_step +a*Ta_step + b] = T2n[i*Ti_step + j*Tj_step +a*Ta_step + b]/(f[i*norb+i]+f[j*norb+j]-f[(a+nocc)*norb+a+nocc]-f[(b+nocc)*norb+b+nocc]);
+
+
+                    }
+                }
+            }
+         //   std::cout<<"T2:"<<i<<"\n";
+        }
+
+    double* swapper = T2;
+    T2 = T2n;
+    T2n = swapper;
+    swapper = T1;
+    T1 = T1n;
+    T1n = swapper;
+    }
+
+
+
+
+
+
+
+
+
+
 
 
     /*
-    - f^{k}_{c} t^{c}_{i} t^{a}_{k} +
-    f^{k}_{c} t^{ac}_{ik} -
-    f^{k}_{i} t^{a}_{k} +
-    f^{a}_{c} t^{c}_{i} +
-    f^{a}_{i} +
-    t^{c}_{k} t^{d}_{i} t^{a}_{l} v^{kl}_{dc} +
-    t^{c}_{k} t^{d}_{i} v^{ak}_{dc} +
-    t^{c}_{k} t^{a}_{l} v^{kl}_{ic} -
-    t^{c}_{k} t^{ad}_{il} v^{kl}_{dc} +
-    t^{c}_{k} v^{ak}_{ic} +
-    \frac{t^{c}_{i} t^{ad}_{kl}}{2} v^{kl}_{dc} +
-    \frac{t^{a}_{l} t^{dc}_{ik}}{2} v^{kl}_{dc} +
-    \frac{t^{dc}_{ik} v^{ak}_{dc}}{2} -
-    \frac{t^{ac}_{kl} v^{kl}_{ic}}{2}
-    */
+       - f^{k}_{c} t^{c}_{i} t^{a}_{k} +
+       f^{k}_{c} t^{ac}_{ik} -
+       f^{k}_{i} t^{a}_{k} +
+       f^{a}_{c} t^{c}_{i} +
+       f^{a}_{i} +
+       t^{c}_{k} t^{d}_{i} t^{a}_{l} v^{kl}_{dc} +
+       t^{c}_{k} t^{d}_{i} v^{ak}_{dc} +
+       t^{c}_{k} t^{a}_{l} v^{kl}_{ic} -
+       t^{c}_{k} t^{ad}_{il} v^{kl}_{dc} +
+       t^{c}_{k} v^{ak}_{ic} +
+       \frac{t^{c}_{i} t^{ad}_{kl}}{2} v^{kl}_{dc} +
+       \frac{t^{a}_{l} t^{dc}_{ik}}{2} v^{kl}_{dc} +
+       \frac{t^{dc}_{ik} v^{ak}_{dc}}{2} -
+       \frac{t^{ac}_{kl} v^{kl}_{ic}}{2}
+     */
     /*
      * f^{k}_{c} t^{c}_{i} t^{ab}_{jk} P(ij) -
      * f^{k}_{c} t^{a}_{k} t^{bc}_{ji} P(ab) +
@@ -298,12 +1117,12 @@ int main(int argc, char const *argv[]) {
 
     std::cout <<"\n\nTIMINGS:\n";
     std::cout <<"--------\n";
-   // std::cout << std::setw( PWIDTH_L ) << "TEI [s]:" <<std::setw( PWIDTH_R )<<ints_end - ints_start<< " s \n";
-   // std::cout << std::setw( PWIDTH_L ) << "SCF [s]:" <<std::setw( PWIDTH_R )<<scf_end-scf_start<< " s \n";
-   // std::cout << std::setw( PWIDTH_L ) << "4-index [s]:" <<std::setw( PWIDTH_R )<<trafo_end-trafo_start<< " s \n";
-   // std::cout << std::setw( PWIDTH_L ) << "ri-4ind [s]:" <<std::setw( PWIDTH_R )<<ritrafo_end-ritrafo_start<< " s \n";
-   // std::cout << std::setw( PWIDTH_L ) << "RI-MP2 [s]:" <<std::setw( PWIDTH_R )<<rimp2_end-rimp2_start<< " s \n";
-   // std::cout << std::setw( PWIDTH_L ) << "MP2 [s]:" <<std::setw( PWIDTH_R )<<mp2_end-mp2_start<< " s \n";
+    // std::cout << std::setw( PWIDTH_L ) << "TEI [s]:" <<std::setw( PWIDTH_R )<<ints_end - ints_start<< " s \n";
+    // std::cout << std::setw( PWIDTH_L ) << "SCF [s]:" <<std::setw( PWIDTH_R )<<scf_end-scf_start<< " s \n";
+    // std::cout << std::setw( PWIDTH_L ) << "4-index [s]:" <<std::setw( PWIDTH_R )<<trafo_end-trafo_start<< " s \n";
+    // std::cout << std::setw( PWIDTH_L ) << "ri-4ind [s]:" <<std::setw( PWIDTH_R )<<ritrafo_end-ritrafo_start<< " s \n";
+    // std::cout << std::setw( PWIDTH_L ) << "RI-MP2 [s]:" <<std::setw( PWIDTH_R )<<rimp2_end-rimp2_start<< " s \n";
+    // std::cout << std::setw( PWIDTH_L ) << "MP2 [s]:" <<std::setw( PWIDTH_R )<<mp2_end-mp2_start<< " s \n";
 
     timer["total"].second = omp_get_wtime();
     std::cout << "------------------------------" << '\n';

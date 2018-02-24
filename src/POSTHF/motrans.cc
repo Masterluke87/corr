@@ -27,7 +27,7 @@ void build_FMo(int nroao,
 
 void MOtrans(double* MOs, int nroao,int nroe, long long int nrofint,long long int* sortcount, double* intval,unsigned short* intnums, double** prec_ints)
 {
-    long long int prec_mem = (long long int) nroe/2*(long long int) nroao* (long long int) nroao* (long long int) nroao;
+    long long int prec_mem = (long long int) nroao*(long long int) nroao* (long long int) nroao* (long long int) nroao;
     std::cout << "Need " << prec_mem*sizeof(double) << " bytes (" << prec_mem*sizeof(double)/1024/1024 << " MB) for precalculation\n";
 
     *prec_ints =  new double[prec_mem];
@@ -38,7 +38,7 @@ void MOtrans(double* MOs, int nroao,int nroe, long long int nrofint,long long in
     long long int istep = nroao*jstep;
     int i,j,k,l;
     long long int prec_count = 0;
-    for(i = 0; i < nroe/2; i++) {
+    for(i = 0; i < nroao; i++) {
         for(j = 0; j < nroao; j++) {
             for(k = 0; k < nroao; k++) {
                 for(l = 0; l <  nroao; l++) {
