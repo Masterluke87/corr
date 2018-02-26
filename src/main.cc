@@ -271,7 +271,7 @@ int main(int argc, char const *argv[]) {
         for(int j=0; j<norb; j++)
             for(int mu=0; mu<nroao; mu++)
                 for(int nu=0; nu<nroao; nu++) {
-                    h_so[i*norb+j] += MOs[(i/2)*nroao +mu]*Hmat[mu*nroao + nu]*MOs[(j/2)*nroao +nu];
+                    h_so[i*norb+j] += MOs[(i/2)*nroao +mu]*Hmat[mu*nroao + nu]*MOs[(j/2)*nroao +nu]*(j%2==i%2);
                 }
 
 
@@ -281,7 +281,7 @@ int main(int argc, char const *argv[]) {
         {
             twoe=0.0;
             for(int j=0; j<nocc; j++)
-                twoe += prec_ints[(i/2)*istep + (a/2)*jstep + (j/2)*kstep + (j/2)]*(i%2==a%2) - prec_ints[(i/2)*istep + (j/2)*jstep + (a/2)*kstep + (j/2)]*(i%2==j%2)*(a%2==j%2);
+                twoe +=get_integral(prec_ints,istep,jstep,kstep, i, j , a , j ) ;
             f[i*norb+a] = h_so[i*norb+a] + twoe;
         }
     double Eel = 0.0;
@@ -374,6 +374,9 @@ int main(int argc, char const *argv[]) {
 
 
 
+    for(int i=0;i<norb;i++)
+        for(int j=0;j<norb;j++)
+            std::cout<<"f["<<i<<","<<j<<"]="<<f[i*norb+j]<<std::endl;
 
 
 
@@ -475,10 +478,11 @@ int main(int argc, char const *argv[]) {
                                             get_integral(prec_ints,istep,jstep,kstep, m , n , tmpe , tmpf );
             }
         }
+
     //Fmi
     for (int m=0;m<nocc;m++)
         for(int i=0;i<nocc;i++){
-            Fmi[m*nocc + i] = (1-(m==i))*f[m*nocc+i];
+            Fmi[m*nocc + i] = (1-(m==i))*f[m*norb+i];
             for(int e=0;e<nvir;e++){
                 Fmi[m*nocc + i] += 0.5 * T1[i*nvir + e] * f[m*norb + (nocc+e)];
             }
@@ -607,13 +611,13 @@ int main(int argc, char const *argv[]) {
 
                 }
 
-
+     std::cout<<"Fmi{0,0}="<<Fmi[0];
     //T1n update
 
     for(int i=0;i<nocc;i++)
         for(int a=0;a<nvir;a++)
         {
-            T1n[i*nvir+a] = f[i*nvir + a];
+            T1n[i*nvir+a] = f[i*norb + (nocc+a)];
             for(int e = 0;e<nvir;e++)
             {
                 T1n[i*nvir+a] +=  T1[i*nvir+e] * Fae[a*nvir + e];
