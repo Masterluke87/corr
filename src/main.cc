@@ -647,10 +647,11 @@ int main(int argc, char const *argv[]) {
             for(int m = 0;m<nocc;m++)
                 for(int e = 0;e<nvir;e++)
                     for(int n = 0;n<nocc;n++){
+                        tmpe = e+nocc;
                         T1n[i*nvir+a] -= 0.5*(T2[m*Ti_step+n*Tj_step+a*Ta_step+e]*get_integral(prec_ints,istep,jstep,kstep, n , m , tmpe , i));
                     }
 
-        T1n[i*nvir+a] /= ( f[i*norb+i] -f[(nocc+a)*norb +nocc+a]);
+        T1n[i*nvir+a] /=( f[i*norb+i] -f[(nocc+a)*norb +nocc+a]);
         }
 
 
@@ -732,9 +733,19 @@ int main(int argc, char const *argv[]) {
                                                                 (T1[m*nvir+b]*get_integral(prec_ints,istep,jstep,kstep, m , tmpa , i , j) );
                     }
 
-                T2n[i*Ti_step+j*Tj_step+a*Ta_step+b]/=(f[i*norb+i]+f[j*norb*j]-f[(nocc+a)*norb+(nocc+a)]-f[(nocc+b)*norb + nocc+b]);
+                T2n[i*Ti_step+j*Tj_step+a*Ta_step+b]/=(f[i*norb+i]+f[j*norb+j]-f[(nocc+a)*norb+(nocc+a)]-f[(nocc+b)*norb + nocc+b]);
 
                 }
+
+    //debug section
+/*
+    for(int i=0;i<(nocc*nvir);i++)
+        std::cout<<i<<" "<<T1n[i]<<std::endl;
+
+*/
+    for(int i=0;i<(nvir*nvir);i++)
+        std::cout<<i<<" "<<T2n[Tj_step + i]<<std::endl;
+    std::cout.flush();
 
 
     double* swapper = T2;
