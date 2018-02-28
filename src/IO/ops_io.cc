@@ -24,10 +24,7 @@
 /*                      STATUS                                                   */
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
-void print_header(int* nroe,int* nroa,int* nroao,int* naux_1,int* naux_2,long long int* nrofint,
-                  long long int* nrofaux,long long int* nrofaux2,
-                  double* coord,double* charges,double* zeff,
-                  std::string* basisNameOB,std::string* basisNameJK,std::string* basisNameRI){
+void print_header(systeminfo *sysinfo){
   char str1[1024];
 
   size_t len = 1024;
@@ -43,30 +40,27 @@ void print_header(int* nroe,int* nroa,int* nroao,int* naux_1,int* naux_2,long lo
   std::cout << "\nSYSTEMDATA" << '\n';
   std::cout << "----------" << "\n\n";
   std::cout<<std::setw(-2)<<"Z" <<std::setw(10)<<"zeff"<<std::setw(10)<<"x" <<std::setw(10) << "y" <<std::setw(10)<< "z" <<'\n';
-  for (size_t i = 0; i < *nroa; i++) {
-        std::cout<<std::setw(-2)<<charges[i]<<std::setw(10)<<zeff[i]<<std::setw(10)<< coord[i*3+0]<<std::setw(10) << coord[i*3+1]<<std::setw(10)<< coord[i*3+2]<<'\n';
+  for (size_t i = 0; i < sysinfo->nroa; i++) {
+        std::cout<<std::setw(-2)<<sysinfo->charges[i]<<std::setw(10)<<sysinfo->zeff[i]<<std::setw(10)<< sysinfo->coord[i*3+0]
+                <<std::setw(10) << sysinfo->coord[i*3+1]<<std::setw(10)<< sysinfo->coord[i*3+2]<<'\n';
   }
 
-  std::cout << "nroe          :" << *nroe<<'\n';
-  std::cout << "nroa          :" << *nroa<<'\n';
-  std::cout << "nroao         :" << *nroao<<'\n';
-  std::cout << "naux-JK       :" << *naux_1<<'\n';
-  std::cout << "naux-RI       :" << *naux_2<<'\n';
-  std::cout << "nrofint       :" << *nrofint<<'\n';
-  std::cout << "nrofaux(JK)   :" << *nrofaux<<'\n';
-  std::cout << "nrofaux(RI)   :" << *nrofaux2<< '\n';
-  std::cout << "basisName(OB) :" << *basisNameOB<<'\n';
-  std::cout << "basisName(JK) :" << *basisNameJK<<'\n';
-  std::cout << "basisName(RI) :" << *basisNameRI<<'\n';
+  std::cout << "nroe          :" << sysinfo->nroe<<'\n';
+  std::cout << "nroa          :" << sysinfo->nroa<<'\n';
+  std::cout << "nroao         :" << sysinfo->nroao<<'\n';
+  std::cout << "naux-JK       :" << sysinfo->naux_1<<'\n';
+  std::cout << "naux-RI       :" << sysinfo->naux_2<<'\n';
+  std::cout << "nrofint       :" << sysinfo->nrofint<<'\n';
+  std::cout << "nrofaux(JK)   :" << sysinfo->nrofaux<<'\n';
+  std::cout << "nrofaux(RI)   :" << sysinfo->nrofaux2<< '\n';
+  std::cout << "basisName(OB) :" << sysinfo->basisNameOB<<'\n';
+  std::cout << "basisName(JK) :" << sysinfo->basisNameJK<<'\n';
+  std::cout << "basisName(RI) :" << sysinfo->basisNameRI<<'\n';
 
   std::cout.flush();
 }
 
-void read_system(std::string filename,int* nroe,int* nroa,
-                  int* nroao, int* naux_1, int* naux_2,
-                  long long int* nrofint,long long int* nrofaux,long long int* nrofaux2,
-                  double** coord,double** charges,double** zeff, double** mass,
-                  std::string* basisNameOB, std::string* basisNameJK, std::string* basisNameRI)
+void read_system(systeminfo *sysinfo)
 {
   char bs1[32];
   char bs2[32];
@@ -74,26 +68,26 @@ void read_system(std::string filename,int* nroe,int* nroa,
   int test;
 
   std::ifstream datf;
-  datf.open(filename);
-  datf.read((char *) nroe, sizeof(int));
-  datf.read((char *) nroa, sizeof(int));
-  datf.read((char *) nroao, sizeof(int));
-  datf.read((char *) naux_1, sizeof(int));
-  datf.read((char *) naux_2, sizeof(int));
-  datf.read((char *) nrofint,   sizeof(long long int));
-  datf.read((char *) nrofaux,   sizeof(long long int));
-  datf.read((char *) nrofaux2,  sizeof(long long int));
+  datf.open(sysinfo->prefix+".sys");
+  datf.read((char *) &(sysinfo->nroe), sizeof(int));
+  datf.read((char *) &(sysinfo->nroa), sizeof(int));
+  datf.read((char *) &(sysinfo->nroao), sizeof(int));
+  datf.read((char *) &(sysinfo->naux_1), sizeof(int));
+  datf.read((char *) &(sysinfo->naux_2), sizeof(int));
+  datf.read((char *) &(sysinfo->nrofint),   sizeof(long long int));
+  datf.read((char *) &(sysinfo->nrofaux),   sizeof(long long int));
+  datf.read((char *) &(sysinfo->nrofaux2),  sizeof(long long int));
 
 
-  *coord   = new double[3*(*nroa)];
-  *charges = new double[(*nroa)];
-  *zeff    = new double[(*nroa)];
-  *mass    = new double[(*nroa)];
+  sysinfo->coord   = new double[3*(sysinfo->nroa)];
+  sysinfo->charges = new double[(sysinfo->nroa)];
+  sysinfo->zeff    = new double[(sysinfo->nroa)];
+  sysinfo->mass    = new double[(sysinfo->nroa)];
 
-  datf.read((char *) *coord, sizeof(double)*3*(*nroa));
-  datf.read((char *) *charges, sizeof(double)*(*nroa));
-  datf.read((char *) *zeff, sizeof(double)*(*nroa));
-  datf.read((char *) *mass,    sizeof(double)*(*nroa));
+  datf.read((char *) sysinfo->coord, sizeof(double)*3*(sysinfo->nroa));
+  datf.read((char *) sysinfo->charges, sizeof(double)*(sysinfo->nroa));
+  datf.read((char *) sysinfo->zeff, sizeof(double)*(sysinfo->nroa));
+  datf.read((char *) sysinfo->mass,    sizeof(double)*(sysinfo->nroa));
   datf.read((char *) bs1,32);
   datf.read((char *) bs2,32);
   datf.read((char *) bs3,32);
@@ -101,25 +95,31 @@ void read_system(std::string filename,int* nroe,int* nroa,
 
   std::stringstream tr1,tr2,tr3;
   tr1 <<bs1;
-  tr1>> (*basisNameOB);
+  tr1>> (sysinfo->basisNameOB);
   tr2 <<bs2;
-  tr2 >> (*basisNameJK);
+  tr2 >> (sysinfo->basisNameJK);
   tr3 <<bs3;
-  tr3 >> (*basisNameRI);
+  tr3 >> (sysinfo->basisNameRI);
 
-
+  sysinfo->atoms.resize(sysinfo->nroa);
+  for (size_t i = 0; i < sysinfo->nroa; i++) {
+      sysinfo->atoms[i].atomic_number = sysinfo->charges[i];
+      sysinfo->atoms[i].x = sysinfo->coord[i*3+0];
+      sysinfo->atoms[i].y = sysinfo->coord[i*3+1];
+      sysinfo->atoms[i].z = sysinfo->coord[i*3+2];
+  }
 }
 
 
-void read_oei(std::string filename,int nroao,double* Hmat,double* Tmat,double* Smat,
-              double* Vmat)
+void read_oei(systeminfo* sysinfo, OEints* onemats)
 {
+  int nroao = sysinfo->nroao;
   std::ifstream datf;
-  datf.open(filename);
-  datf.read((char * ) Hmat, sizeof(double)*nroao*nroao);
-	datf.read((char * ) Tmat, sizeof(double)*nroao*nroao);
-	datf.read((char * ) Smat, sizeof(double)*nroao*nroao);
-	datf.read((char * ) Vmat, sizeof(double)*nroao*nroao);
+  datf.open(sysinfo->prefix + ".oei");
+  datf.read((char * ) onemats->Hmat, sizeof(double)*nroao*nroao);
+  datf.read((char * ) onemats->Tmat, sizeof(double)*nroao*nroao);
+  datf.read((char * ) onemats->Smat, sizeof(double)*nroao*nroao);
+  datf.read((char * ) onemats->Vmat, sizeof(double)*nroao*nroao);
   datf.close();
 }
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
@@ -200,14 +200,13 @@ void get_sys_size(std::string sysfile,int* nroe, int* nroao, int* nroa, long lon
 }
 
 
-void read_tei(std::string filename,long long int nrofint, long long int* sortcount,double* intval,
-              unsigned short* intnums)
+void read_tei(systeminfo* sysinfo, TEints* t)
 {
   std::ifstream datf;
-  datf.open(filename);
-  datf.read((char *) sortcount, sizeof(long long int)*4);
-	datf.read((char *) intval,    sizeof(double)*nrofint);
-	datf.read((char *) intnums,   sizeof(unsigned short)*nrofint*4);
+  datf.open(sysinfo->prefix+".tei");
+  datf.read((char *)   &(t->sortcount), sizeof(long long int)*4);
+    datf.read((char *) t->intval,    sizeof(double)*sysinfo->nrofint);
+    datf.read((char *) t->intnums,   sizeof(unsigned short)*sysinfo->nrofint*4);
 	datf.close();
 
 }

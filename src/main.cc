@@ -22,6 +22,7 @@
 #define PWIDTH_R 16
 
 
+
 double get_integral(double* ints,long long int &istep,long long int &jstep,long long int &kstep,int  &i,int  &j,int &k,int &l){
     return ints[(i/2)*istep + (k/2)*jstep + (j/2)*kstep + l/2]*(i%2==k%2)*(j%2==l%2) -
            ints[(i/2)*istep + (l/2)*jstep + (j/2)*kstep + k/2]*(i%2==l%2)*(j%2==k%2);
@@ -39,26 +40,7 @@ int main(int argc, char const *argv[]) {
 
     // System Information:
 
-    int nroe;                  //Nr of electrons  (if negative, read in center of mass)
-    int nroa;                  //nr of atoms
-
-    int nroao;                 //nr of basis functions
-    int naux_1;                //nr of /JK
-    int naux_2;                //nr of /C
-
-    std::string basisNameOB;
-    std::string basisNameJK;
-    std::string basisNameRI;
-
-
-    double*        coord;       //atomic coordinats               3*nroa
-    double*        charges;     //atomic charges                    nroa
-    double*        zeff;        //in case ecps are used             nroa
-    double*        mass;        //atomic masses                     nroa
-
-    long long int nrofint;     //Nr of two electron Integrals
-    long long int nrofaux;
-    long long int nrofaux2;
+    systeminfo *sysinfo = new systeminfo;
 
     std::map<std::string,std::pair<double,double> > timer;
 
@@ -71,28 +53,18 @@ int main(int argc, char const *argv[]) {
         exit(1);
     }
 
-    std::string prefix = argv[1];
-    read_system(prefix+".sys",&nroe,&nroa,&nroao,&naux_1,
-                &naux_2,&nrofint,&nrofaux,&nrofaux2,&coord,
-                &charges,&zeff,&mass,&basisNameOB,&basisNameJK,&basisNameRI);
-    double ion_rep =  calc_ion_rep( nroa, coord, zeff);
-    print_header(&nroe,&nroa,&nroao,&naux_1,&naux_2,&nrofint,&nrofaux,
-                 &nrofaux2,coord,charges,zeff,
-                 &basisNameOB,&basisNameJK,&basisNameRI);
+    sysinfo->prefix = argv[1];
+    read_system(sysinfo);
+
+    sysinfo->ion_rep =  calc_ion_rep(sysinfo);
+    print_header(sysinfo);
 
 
     libint2::initialize();
-    std::vector<libint2::Atom> atoms(nroa);
-    for (size_t i = 0; i < nroa; i++) {
-        atoms[i].atomic_number = charges[i];
-        atoms[i].x = coord[i*3+0];
-        atoms[i].y = coord[i*3+1];
-        atoms[i].z = coord[i*3+2];
-    }
-    libint2::BasisSet obs(basisNameOB,atoms);
-    libint2::BasisSet dfbs(basisNameRI,atoms);
-    obs.set_pure(true);
-    dfbs.set_pure(true);
+
+    libint2::BasisSet obs(sysinfo->basisNameOB,sysinfo->atoms);
+    libint2::BasisSet dfbs(sysinfo->basisNameRI,sysinfo->atoms);
+    obs.set_pure(true);dfbs.set_pure(true);
 
     /*
      *
@@ -100,72 +72,46 @@ int main(int argc, char const *argv[]) {
      *
      */
 
+    OEints* onemats = new OEints;
+    TEints* twomats = new TEints;
 
-
-    double* dumd;
-    //one electron mat&vecs
-    double*        Hmat;        //one electron Hamiltionian         nroao*nroao
-    double*        Tmat;        //Kinetic energy operator           nroao*nroao
-    double*        Smat;        //Overlap matrix S                  nroao*nroao
-    double*        Som12;       //S^-1/2                            nroao*nroao
-    double*        Vmat;        //Nuclear repuslsion
-
-    double*        MOens;       //MO Energies
-    double*        MOs;         //MO coeffs
-    double*        Pmat;      //density matrix                    nroao*nroao
-    double*        Fmat;
-
-    dumd = new double[9*nroao*nroao];
-    int inc = 0;
-
-    Hmat  = &(dumd[inc]); inc+=nroao*nroao;
-    Tmat  = &(dumd[inc]); inc+=nroao*nroao;
-    Smat  = &(dumd[inc]); inc+=nroao*nroao;
-    Som12 = &(dumd[inc]); inc+=nroao*nroao;
-    Vmat  = &(dumd[inc]); inc+=nroao*nroao;
-
-    MOens = &(dumd[inc]); inc+=nroao*nroao;
-    MOs   = &(dumd[inc]); inc+=nroao*nroao;
-    Pmat  = &(dumd[inc]); inc+=nroao*nroao;
-    Fmat  = &(dumd[inc]); inc+=nroao*nroao;
-
-
+    allocate_onemats(sysinfo,onemats);
     // Always read the One-Electron Matrices
     // Maybe on a day in a far far future, we calculate the OEI
 
-    read_oei(prefix+".oei",nroao,Hmat,Tmat, Smat,Vmat);
-    double* intval;
-    unsigned short* intnums;
-    long long int sortcount[4];
+    read_oei(sysinfo,onemats);
+
 
     //Two possibilities:
     //1) ERI provided -> read them
     //2) NO ERI provided -> Transform Hmat to Libint -> Calculate -> ERI
 
-    if (nrofint > 0) {
+    if (sysinfo->nrofint > 0) {
         std::cout << "Two electron integrals provided, reading in .." << '\n';
-        intval        = new double[nrofint];                   //two electron integrals
-        intnums       = new unsigned short[nrofint*4];         //two electron indices
+        twomats->intval        = new double[sysinfo->nrofint];                   //two electron integrals
+        twomats->intnums       = new unsigned short[sysinfo->nrofint*4];         //two electron indices
 
         //ints_start = omp_get_wtime();
-        read_tei(prefix+".tei",nrofint,sortcount,intval,intnums);
+        read_tei(sysinfo,twomats);
         //ints_end = omp_get_wtime();
     }else{
         std::cout << "No Tei's provided ... using libint to calculate them" << '\n';
 
-        calculate_libint_oei(atoms,obs,zeff,Hmat,Tmat, Smat, Vmat);
+        calculate_libint_oei(sysinfo,obs,onemats);
         //ints_start = omp_get_wtime();
-        calculate_libint_tei(atoms,obs,nrofint,&intval,&intnums,sortcount);
+        calculate_libint_tei(sysinfo,obs,twomats);
         //ints_end = omp_get_wtime();
 
     }
-    calc_S12(nroao, Smat, Som12);
+    calc_S12(sysinfo,onemats);
 
     /*
      *
      * Part 3: Read Guess & Perform SCF
      *
      */
+
+    /*
     read_wav_HF(prefix+".ahfw",nroao,MOens,MOs);
     {             //check if gd orbitals are provided;
         double modiag=0.0;
@@ -195,7 +141,7 @@ int main(int argc, char const *argv[]) {
      * perform mp2
      *
      */
-
+/*
     double* FMo  = new double[nroao*nroao];
     build_FMo(nroao,Fmat,FMo,MOs);
     double* prec_ints;
@@ -241,7 +187,7 @@ int main(int argc, char const *argv[]) {
      * eri tensor in spin orbital basis
      */
 
-
+/*
     std::cout<<"nel:"<<nroe<<std::endl;
     std::cout<<"nocc:"<<nroe<<std::endl;
     std::cout<<"nvir:"<<(2*nroao - nroe)<<std::endl;
@@ -853,7 +799,7 @@ int main(int argc, char const *argv[]) {
 
     std::cout.flush();
     */
-
+/*
     double* swapper = T2;
     T2 = T2n;
     T2n = swapper;

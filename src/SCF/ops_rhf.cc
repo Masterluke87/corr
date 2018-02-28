@@ -12,8 +12,37 @@ extern void symmortho_mat(int nroao, double *mat, double* tmat, double* dummat);
 extern void transform_MOs(int nroao, double *MOs, double* tmat, double* tmpvec);
 
 
-void calculate_libint_oei(std::vector<libint2::Atom> &atoms,libint2::BasisSet &obs,double* zeff,
-                          double* Hmat,double* Tmat,double* Smat,double* Vmat)
+
+
+void allocate_onemats(systeminfo *sysinfo, OEints* onemats)
+{
+    double* dumd;
+    int nroao = sysinfo->nroao;
+    //one electron mat&vecs
+
+    dumd = new double[9*nroao*nroao];
+    int inc = 0;
+
+    onemats->Hmat  = &(dumd[inc]); inc+=nroao*nroao;
+    onemats->Tmat  = &(dumd[inc]); inc+=nroao*nroao;
+    onemats->Smat  = &(dumd[inc]); inc+=nroao*nroao;
+    onemats->Som12 = &(dumd[inc]); inc+=nroao*nroao;
+    onemats->Vmat  = &(dumd[inc]); inc+=nroao*nroao;
+
+    onemats->MOens = &(dumd[inc]); inc+=nroao*nroao;
+    onemats->MOs   = &(dumd[inc]); inc+=nroao*nroao;
+    onemats->Pmat  = &(dumd[inc]); inc+=nroao*nroao;
+    onemats->Fmat  = &(dumd[inc]); inc+=nroao*nroao;
+
+}
+
+
+
+
+
+
+
+void calculate_libint_oei(systeminfo* sysinfo,libint2::BasisSet &obs,OEints* onemats)
 {
     //UPDATE: we expect now that the shell order in Libint2 is the same as in Psi4
     //otherwise uncomment code...
@@ -28,9 +57,9 @@ void calculate_libint_oei(std::vector<libint2::Atom> &atoms,libint2::BasisSet &o
 	libint2::Engine t_engine(libint2::Operator::kinetic,obs.max_nprim(),obs.max_l());
 	libint2::Engine v_engine(libint2::Operator::nuclear,obs.max_nprim(),obs.max_l());
 
-	std::vector<std::pair<double, std::array<double, 3> > > q(atoms.size());
-	for (size_t i = 0; i < atoms.size(); i++) {
-		q.push_back({zeff[i],{{atoms[i].x,atoms[i].y,atoms[i].z}}});
+    std::vector<std::pair<double, std::array<double, 3> > > q(sysinfo->atoms.size());
+    for (size_t i = 0; i < sysinfo->atoms.size(); i++) {
+        q.push_back({sysinfo->zeff[i],{{sysinfo->atoms[i].x,sysinfo->atoms[i].y,sysinfo->atoms[i].z}}});
 	}
 	v_engine.set_params(q);
 
@@ -40,8 +69,8 @@ void calculate_libint_oei(std::vector<libint2::Atom> &atoms,libint2::BasisSet &o
 	std::vector<int> two_shift;
  //   two_shift = {0,0,0,0,0,0,0,0,0,0,0};
  //   one_shift = {0,0,0,0,0,0,0,0,0,0,0};
-	int one_size = 0;
-	int two_size = 0;
+//	int one_size = 0;
+//	int two_size = 0;
 	const auto& buf_vec_t = t_engine.results();
 	const auto& buf_vec_s = s_engine.results();
 	const auto& buf_vec_v = v_engine.results();
@@ -165,19 +194,19 @@ void calculate_libint_oei(std::vector<libint2::Atom> &atoms,libint2::BasisSet &o
 	}
 */
     for (size_t i = 0; i < nroao*nroao; i++) {
-        tmatdiff += fabs(Tmat[i] - Tmat_libint[i]);
-        smatdiff += fabs(Smat[i] - Smat_libint[i]);
-        vmatdiff += fabs(Vmat[i] - Vmat_libint[i]);
-        hmatdiff += fabs(Hmat[i] - Hmat_libint[i]);
+        tmatdiff += fabs(onemats->Tmat[i] - Tmat_libint[i]);
+        smatdiff += fabs(onemats->Smat[i] - Smat_libint[i]);
+        vmatdiff += fabs(onemats->Vmat[i] - Vmat_libint[i]);
+        hmatdiff += fabs(onemats->Hmat[i] - Hmat_libint[i]);
 
-        if (fabs(Tmat[i] - Tmat_libint[i])>tmatmax)
-            tmatmax = fabs(Tmat[i] - Tmat_libint[i]);
-        if (fabs(Smat[i] - Smat_libint[i]) > smatmax)
-            smatmax = fabs(Smat[i] - Smat_libint[i]);
-        if (fabs(Vmat[i] - Vmat_libint[i]) > vmatmax)
-            vmatmax = fabs(Vmat[i] - Vmat_libint[i]);
-        if (fabs(Hmat[i] - Hmat_libint[i]) > hmatmax)
-            hmatmax = fabs(Hmat[i] - Hmat_libint[i]);
+        if (fabs(onemats->Tmat[i] - Tmat_libint[i])>tmatmax)
+            tmatmax = fabs(onemats->Tmat[i] - Tmat_libint[i]);
+        if (fabs(onemats->Smat[i] - Smat_libint[i]) > smatmax)
+            smatmax = fabs(onemats->Smat[i] - Smat_libint[i]);
+        if (fabs(onemats->Vmat[i] - Vmat_libint[i]) > vmatmax)
+            vmatmax = fabs(onemats->Vmat[i] - Vmat_libint[i]);
+        if (fabs(onemats->Hmat[i] - Hmat_libint[i]) > hmatmax)
+            hmatmax = fabs(onemats->Hmat[i] - Hmat_libint[i]);
 
 
     }
@@ -230,11 +259,11 @@ double calc_r_ab(int a, int b, double* coord){
 /* calculates the ion core coulomb repulsion                                     */
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
-double calc_ion_rep(int nroa, double* coord, double* charges){
+double calc_ion_rep(systeminfo *sysinfo){
 	double ion_rep = 0.;
-	for(int x = 0; x < nroa; x++) {
-		for(int y = x+1; y < nroa; y++) {
-			ion_rep += charges[x]*charges[y]/calc_r_ab(x,y,coord);
+    for(int x = 0; x < sysinfo->nroa; x++) {
+        for(int y = x+1; y < sysinfo->nroa; y++) {
+            ion_rep += sysinfo->charges[x] * sysinfo->charges[y]/calc_r_ab(x,y,sysinfo->coord);
 		}
 	}
 
@@ -289,7 +318,9 @@ void calc_mu_core(int nroa, double* coord, double* charges, double* point,
 /* returns mimum eigenvalue of S                                                 */
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
-double calc_S12(int nroao, double* Smat, double* Som12){
+double calc_S12(systeminfo *sysinfo, OEints* onemats){
+
+    int nroao = sysinfo->nroao;
 
 	double* tmpspace = new double[3*nroao*nroao];
 	int inc=0;
@@ -297,7 +328,7 @@ double calc_S12(int nroao, double* Smat, double* Som12){
 	double* tmpvecs = &(tmpspace[inc]); inc+=nroao*nroao;
 	double* tmpvals = &(tmpspace[inc]);
 
-	diag_mat(nroao, Smat, tmpvals, tmpvecs);
+    diag_mat(nroao, onemats->Smat, tmpvals, tmpvecs);
 
 	double min_val =10.;
 	for(int x = 0; x < nroao; x++) {
@@ -305,21 +336,21 @@ double calc_S12(int nroao, double* Smat, double* Som12){
 	}
 
 	for(int x = 0; x <  nroao*nroao; x++) {
-		Som12[x] = 0.; tmpmat[x] = 0.;
+        onemats->Som12[x] = 0.; tmpmat[x] = 0.;
 	}
 	for(int x = 0; x <  nroao; x++)
-		Som12[x*nroao+x] = 1./sqrt(tmpvals[x]);
+        onemats->Som12[x*nroao+x] = 1./sqrt(tmpvals[x]);
 	for(int x = 0; x  < nroao; x++) {
 		for(int y = 0; y < nroao; y++) {
 			for(int z = 0; z < nroao; z++) //Adjungiert !!!!!!
-				tmpmat[x*nroao+y] +=  Som12[z*nroao+y] * tmpvecs[z*nroao+x];
+                tmpmat[x*nroao+y] +=  onemats->Som12[z*nroao+y] * tmpvecs[z*nroao+x];
 		}
 	}
 	for(int x = 0; x  < nroao; x++) {
 		for(int y = 0; y < nroao; y++) {
-			Som12[x*nroao+y] = 0.;
+            onemats->Som12[x*nroao+y] = 0.;
 			for(int z = 0; z < nroao; z++)
-				Som12[x*nroao+y] += tmpvecs[z*nroao+y] * tmpmat[x*nroao+z];
+                onemats->Som12[x*nroao+y] += tmpvecs[z*nroao+y] * tmpmat[x*nroao+z];
 		}
 	}
 	delete[] tmpspace;
@@ -563,8 +594,8 @@ double   calc_op_1el(int nroao, double* opmat, double* Pmat){
 }
 
 
-void calculate_libint_tei(std::vector<libint2::Atom> &atoms,libint2::BasisSet &obs,
-                          long long int &nrofint,double** intval,unsigned short** intnums,long long int * sortcount)
+void calculate_libint_tei(systeminfo *sysinfo, libint2::BasisSet &obs,
+                          TEints *twomats)
 {
 	libint2::Engine eri_engine(libint2::Operator::coulomb,obs.max_nprim(),obs.max_l());
 	auto shell2bf = obs.shell2bf();
@@ -616,8 +647,8 @@ void calculate_libint_tei(std::vector<libint2::Atom> &atoms,libint2::BasisSet &o
                     }
 				}
 
-	*intval        = new double[count];                       //two electron integrals
-	*intnums       = new unsigned short[count*4];             //two electron indices
+    twomats->intval        = new double[count];                       //two electron integrals
+    twomats->intnums       = new unsigned short[count*4];             //two electron indices
 	count=0;
 	int sw_count =0;
 
@@ -653,11 +684,11 @@ void calculate_libint_tei(std::vector<libint2::Atom> &atoms,libint2::BasisSet &o
                                         if (((bf1+f1) >= (bf2+f2)) && ((bf3+f3) >= (bf4+f4)) && (((bf1+f1)*(bf1+f1+1)/2 +(bf2+f2))>=((bf3+f3)*(bf3+f3+1)/2+(bf4+f4))))
                                         {
                                         if (std::fabs(integral)>1.0E-12) {
-												(*intval)[count] = integral;
-												(*intnums)[count*4+0] = bf1+f1;
-												(*intnums)[count*4+1] = bf2+f2;
-												(*intnums)[count*4+2] = bf3+f3;
-												(*intnums)[count*4+3] = bf4+f4;
+                                                twomats->intval[count] = integral;
+                                                twomats->intnums[count*4+0] = bf1+f1;
+                                                twomats->intnums[count*4+1] = bf2+f2;
+                                                twomats->intnums[count*4+2] = bf3+f3;
+                                                twomats->intnums[count*4+3] = bf4+f4;
 												count++;
                                             }
                                         }
@@ -665,8 +696,8 @@ void calculate_libint_tei(std::vector<libint2::Atom> &atoms,libint2::BasisSet &o
 					}
 				}
 				std::cout << "Schwarz count:" <<sw_count<< '\n';
-    nrofint        = count;
-	resort_integrals(*intnums,*intval,count,sortcount);
+    sysinfo->nrofint        = count;
+    resort_integrals(twomats->intnums,twomats->intval,count,twomats->sortcount);
 
 }
 
