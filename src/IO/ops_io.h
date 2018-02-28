@@ -44,6 +44,7 @@ struct systeminfo{
     std::vector<libint2::Atom> atoms;
 
     double ion_rep;
+    int scfiter;
 
     std::string prefix;
 };
@@ -82,11 +83,10 @@ void read_sys_1el(char* sysfile, double* coord, double* charges, double* mass,
 		  double* Hmat, double* Tmat, double* Smat,  double* Dx, double* Dy,
 		  double *Dz);
 void write_wav_HF(std::string wavfile, int nroao, double* MOens, double* MOs);
-void read_wav_HF(std::string wavfile, int nroao, double* MOens, double* MOs);
+void read_wav_HF(systeminfo *sysinfo, OEints * onemats);
 void output_matrix(double* mat,int nr_of_col, int nrop, std::ofstream *outf);
 
 void read_system(systeminfo* sysinfo);
-
 void read_oei(systeminfo *sysi, OEints *oemats);
 void read_tei(systeminfo *sysi, TEints *t);
 

@@ -280,10 +280,10 @@ void write_wav_HF(std::string wavfile, int nroao, double* MOens, double* MOs){
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 
 
-void read_wav_HF(std::string wavfile, int nroao, double* MOens, double* MOs){
-  std::ifstream inf(wavfile.c_str());
+void read_wav_HF(systeminfo *sysinfo, OEints * onemats){
+  std::ifstream inf(sysinfo->prefix + ".ahfw");
   int real_nroao;
-
+  int nroao = sysinfo->nroao;
   inf.read((char *) &real_nroao, sizeof(int));
   if(real_nroao != nroao){
     std::cerr << "Wrong HF wavefunction size in read_wav_HF!\n"; exit(3);
@@ -292,8 +292,8 @@ void read_wav_HF(std::string wavfile, int nroao, double* MOens, double* MOs){
   //DEBUG 04052012TK
   //cerr << real_nroao << " " << nroao << "\n";
 
-  inf.read((char *) MOens,  sizeof(double)*nroao);
-  inf.read((char *) MOs,    sizeof(double)*nroao*nroao);
+  inf.read((char *) onemats->MOens,  sizeof(double)*nroao);
+  inf.read((char *) onemats->MOs,    sizeof(double)*nroao*nroao);
 
   inf.close();
 }

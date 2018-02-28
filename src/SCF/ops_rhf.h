@@ -5,6 +5,8 @@
 #include <vector>
 #include <libint2.hpp>
 
+
+void check_initial_guess(systeminfo *sysinfo,OEints *onemats);
 void allocate_onemats(systeminfo *sysinfo,OEints* onemats);
 
 double calc_r_ab(int a, int b, double* coord);

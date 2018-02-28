@@ -111,25 +111,14 @@ int main(int argc, char const *argv[]) {
      *
      */
 
-    /*
-    read_wav_HF(prefix+".ahfw",nroao,MOens,MOs);
-    {             //check if gd orbitals are provided;
-        double modiag=0.0;
-        for (size_t i = 0; i < nroao; i++) {
-            modiag += MOs[i*nroao+i];
-        }
-        if (std::fabs(modiag) < 0.1) {
-            std::cout << "No converged MOs provided... doing core guess" << '\n';
-            for (int i =0; i<nroao*nroao; i++)
-                Fmat[i] = Hmat[i];
-            double *tmpmat = new double[nroao*nroao];
-            diag_Fmat(nroao, Fmat,MOs,MOens,Som12, tmpmat);
-            delete[] tmpmat;
-        }
-    }
+
+    read_wav_HF(sysinfo,onemats);
+    check_initial_guess(sysinfo,onemats);
+
+    sysinfo->scfiter = 100;
     timer["SCF"] = std::make_pair(0.0,0.0);
     timer["SCF"].first =omp_get_wtime();
-    run_scf(nroao,nroe,MOs,Pmat,Hmat,Smat,Fmat,MOens,intnums,intval,sortcount,nrofint,Som12,100,ion_rep);
+    run_scf(sysinfo,onemats,twomats);
     timer["SCF"].second=omp_get_wtime();
 
 

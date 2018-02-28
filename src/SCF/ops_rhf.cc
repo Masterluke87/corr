@@ -12,8 +12,29 @@ extern void symmortho_mat(int nroao, double *mat, double* tmat, double* dummat);
 extern void transform_MOs(int nroao, double *MOs, double* tmat, double* tmpvec);
 
 
+void check_initial_guess(systeminfo *sysinfo,OEints *onemats)
+{
+                 //check if gd orbitals are provided;
+    int nroao = sysinfo->nroao;
+    double* MOs   = onemats->MOs;
+    double* Fmat  = onemats->Fmat;
+    double* Hmat  = onemats->Hmat;
+    double* Som12 = onemats->Som12;
+    double* MOens = onemats->MOens;
+    double modiag=0.0;
+    for (size_t i = 0; i < nroao; i++) {
+            modiag += MOs[i*nroao+i];
+    }
+    if (std::fabs(modiag) < 0.1) {
+    std::cout << "No converged MOs provided... doing core guess" << '\n';
+            for (int i =0; i<nroao*nroao; i++)
+                Fmat[i] = Hmat[i];
+            double *tmpmat = new double[nroao*nroao];
+            diag_Fmat(nroao, Fmat,MOs,MOens,Som12, tmpmat);
+            delete[] tmpmat;
+        }
 
-
+}
 void allocate_onemats(systeminfo *sysinfo, OEints* onemats)
 {
     double* dumd;

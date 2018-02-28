@@ -142,10 +142,27 @@ void calc_diis_error(int nroao,double* Fmat,double* Pmat,double* Smat,double* gr
     delete[] tFDS;
     delete[] tmp;
 }
-void run_scf(int nroao,int nroe, double* C, double* Pmat,double* Hmat,double* Smat,double* Fmat,double* MOens,
-             unsigned short* intnums, double* intvals, long long int* sortcount,
-             long long int nrofint, double* Som12, int maxiter,double ion_rep){
+void run_scf(systeminfo *sysinfo,OEints *onemats,TEints* twomats){
     std::cout << "\nSCF:\n----" << '\n';
+
+    int nroao = sysinfo->nroao;
+    int nroe  = sysinfo->nroe;
+    double* C = onemats->MOs;
+    double* Pmat = onemats->Pmat;
+    double* Hmat = onemats->Hmat;
+    double* Smat = onemats->Smat;
+    double* Fmat = onemats->Fmat;
+    double* MOens = onemats->MOens;
+    unsigned short* intnums = twomats->intnums;
+    double* intvals = twomats->intval;
+    long long int* sortcount = twomats->sortcount;
+    long long int nrofint = sysinfo->nrofint;
+    double* Som12 = onemats->Som12;
+    int maxiter = sysinfo->scfiter;
+    double ion_rep = sysinfo->ion_rep;
+
+
+
 
     double* tmpmat = new double[nroao*nroao];
 
