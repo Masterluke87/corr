@@ -5,11 +5,13 @@
 #include <string.h>
 #include "motrans.h"
 
+void build_FMo(systeminfo *sysinfo,OEints* onemats, pHF* postHF)
+    {
 
-void build_FMo(int nroao,
-               double* Fmat,
-               double* FMo,
-               double* MOs){
+    int nroao    = sysinfo->nroao;
+    double* Fmat = onemats->Fmat;
+    double* FMo  = postHF->FMo;
+    double* MOs  = onemats->MOs;
 
     memset(FMo,0,nroao*nroao*sizeof(double));
 
@@ -25,12 +27,24 @@ void build_FMo(int nroao,
 }
 
 
-void MOtrans(double* MOs, int nroao,int nroe, long long int nrofint,long long int* sortcount, double* intval,unsigned short* intnums, double** prec_ints)
+void MOtrans(systeminfo *sysinfo,OEints* onemats,TEints *twomats,pHF* postHF)
 {
+    double* MOs              = onemats->MOs;
+    int nroao                = sysinfo->nroao;
+    int nroe                 = sysinfo->nroe;
+    long long int nrofint    = sysinfo->nrofint;
+    long long int* sortcount = twomats->sortcount;
+    double* intval           = twomats->intval;
+    unsigned short* intnums  = twomats->intnums;
+    double* prec_ints;
+
+
+
+
     long long int prec_mem = (long long int) nroao*(long long int) nroao* (long long int) nroao* (long long int) nroao;
     std::cout << "Need " << prec_mem*sizeof(double) << " bytes (" << prec_mem*sizeof(double)/1024/1024 << " MB) for precalculation\n";
 
-    *prec_ints =  new double[prec_mem];
+    postHF->prec_ints =  new double[prec_mem];
 
     //4-index trans
     long long int kstep = nroao;
@@ -42,7 +56,7 @@ void MOtrans(double* MOs, int nroao,int nroe, long long int nrofint,long long in
         for(j = 0; j < nroao; j++) {
             for(k = 0; k < nroao; k++) {
                 for(l = 0; l <  nroao; l++) {
-                    (*prec_ints)[prec_count] = mo2int_op(i, j, k, l,nroao, MOs, nrofint, sortcount, intval, intnums,&std::cout);
+                    postHF->prec_ints[prec_count] = mo2int_op(i, j, k, l,nroao, MOs, nrofint, sortcount, intval, intnums,&std::cout);
                     prec_count++;
                 }
             }

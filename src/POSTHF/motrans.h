@@ -1,5 +1,8 @@
-void MOtrans(double *MOs, int nroao, int nroe, long long nrofint, long long int* sortcount, double* intval, unsigned short *intnums, double** prec_ints);
+#include "../IO/ops_io.h"
 
+
+
+void MOtrans(systeminfo *sysinfo,OEints* onemats,TEints *twomats,pHF* postHF);
 double calc_mo2int_bf(int i, int j, int k, int l, int nroao, double* MOs,
                       long long int nrofint, long long int* sortcount, double* intval,
                       unsigned short* intnums);
@@ -23,7 +26,4 @@ void transform_ri(int nroe,            //nr of electrons
 
 
 
-void build_FMo(int nroao,
-               double* Fmat,
-               double* FMo,
-               double* MOs);
+void build_FMo(systeminfo *sysinfo,OEints* onemats, pHF* postHF);

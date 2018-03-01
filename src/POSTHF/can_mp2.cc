@@ -2,16 +2,18 @@
 #include <cstring>
 #include <iomanip>
 #include <cblas.h>
+#include "../IO/ops_io.h"
 #define PWIDTH_L 12
 #define PWIDTH_R 16
 
 
 
-void run_canonical_mp2(int nroe,                //Number of Electrons
-                       int nroao,               //Nr of bsf in orbital basis
-                       double* prec_ints,       //tranformed intergals
-                       double* FMo)             //Fock Matrix in MO Basis
+void run_canonical_mp2(systeminfo* sysinfo,pHF *postHF)             //Fock Matrix in MO Basis
 {
+    int nroe = sysinfo->nroe;
+    int nroao = sysinfo->nroao;
+    double* prec_ints = postHF->prec_ints;
+    double* FMo = postHF->FMo;
     double EMP2 = 0.0;
     double EMP2_SS = 0.0;
     double EMP2_OS = 0.0;

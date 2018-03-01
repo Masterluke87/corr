@@ -18,6 +18,12 @@
 #include <libint2.hpp>
 
 
+struct pHF{
+    double* FMo;
+    double* prec_ints;
+};
+
+
 struct systeminfo{
 
     int nroe;

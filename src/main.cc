@@ -130,22 +130,22 @@ int main(int argc, char const *argv[]) {
      * perform mp2
      *
      */
-/*
-    double* FMo  = new double[nroao*nroao];
-    build_FMo(nroao,Fmat,FMo,MOs);
-    double* prec_ints;
+
+    pHF* postHF = new pHF;
+
+    build_FMo(sysinfo,onemats,postHF);
     {
 
         double trafo_start = omp_get_wtime();
-        MOtrans(MOs,nroao,nroe,nrofint,sortcount,intval,intnums,&prec_ints);
-        double trafo_end = omp_get_wtime();
+        MOtrans(sysinfo,onemats,twomats,postHF);
 
+        double trafo_end = omp_get_wtime();
         double mp2_start = omp_get_wtime();
-        run_canonical_mp2(nroe,nroao,prec_ints,FMo);
+        run_canonical_mp2(sysinfo,postHF);
         double mp2_end   = omp_get_wtime();
     }
 
-
+/*
 
     //RI-MP2 //trafo
 
