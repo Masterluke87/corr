@@ -8,8 +8,13 @@
 void build_FMo(systeminfo *sysinfo,OEints* onemats, pHF* postHF)
     {
 
+
     int nroao    = sysinfo->nroao;
     double* Fmat = onemats->Fmat;
+
+    postHF->FMo = new double[nroao*nroao];
+
+
     double* FMo  = postHF->FMo;
     double* MOs  = onemats->MOs;
 

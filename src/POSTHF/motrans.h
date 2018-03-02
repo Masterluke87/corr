@@ -17,13 +17,6 @@ void read_transform_ri(std::string prefix,  //prefix to find the file
                        );
 
 
-void transform_ri(int nroe,            //nr of electrons
-                  int nroao,           //nr of bsf in aobasis
-                  int naux_2,          //nr of aux basis functions
-                  double* MOs,         //orbitals for transformation
-                  double* BPQ,          //input - calculated b^Q_pq
-                  double* Bia);         //output - transformed array containing mointegrals)
 
-
-
+void MOtrans(systeminfo *sysinfo,OEints* onemats,TEints *twomats,pHF* postHF);
 void build_FMo(systeminfo *sysinfo,OEints* onemats, pHF* postHF);

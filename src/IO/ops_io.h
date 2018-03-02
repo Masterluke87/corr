@@ -21,6 +21,8 @@
 struct pHF{
     double* FMo;
     double* prec_ints;
+    double* BPQ;
+    double* Bia;
 };
 
 

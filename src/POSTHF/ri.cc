@@ -1,4 +1,6 @@
 #include "ri.h"
+#include "../IO/ops_io.h"
+
 
 
 
@@ -11,11 +13,14 @@ void calculate_ri(libint2::BasisSet &obs,libint2::BasisSet &dfbs, double* BPQ)
     int naux_2 = dfbs.nbf();
     int nroao  = obs.nbf();
 
-    double* J        = new double[naux_2*naux_2];
-    double* eigval   = new double[naux_2];
-    double* eigvec   = new double[naux_2*naux_2];
-    double* eigvec_c = new double[naux_2*naux_2];
-    double* B        = new double[naux_2*nroao*nroao];
+    double* dumbd    = new double[3*naux_2*naux_2+naux_2*nroao*nroao+naux_2];
+    int inc          = 0;
+
+    double* J        = &(dumbd[inc]);inc+=naux_2*naux_2;
+    double* eigvec_c = &(dumbd[inc]);inc+=naux_2*naux_2;
+    double* B        = &(dumbd[inc]);inc+=naux_2*nroao*nroao;
+    double* eigval   = &(dumbd[inc]);inc+=naux_2;
+    double* eigvec   = &(dumbd[inc]);
 
     libint2::Engine eri2_engine(libint2::Operator::coulomb, dfbs.max_nprim(), dfbs.max_l());
     eri2_engine.set_braket(libint2::BraKet::xs_xs);
@@ -97,11 +102,7 @@ void calculate_ri(libint2::BasisSet &obs,libint2::BasisSet &dfbs, double* BPQ)
     cblas_dgemm(CblasRowMajor,CblasNoTrans,CblasNoTrans,naux_2,nroao*nroao,naux_2,1.0,J,naux_2,B,nroao*nroao,0.0,
                 BPQ,nroao*nroao);
 
-    delete[] eigval;
-    delete[] eigvec_c;
-    delete[] eigvec;
-    delete[] J;
-    delete[] B;
+    delete[] dumbd;
 }
 
 
@@ -143,13 +144,15 @@ void read_transform_ri(std::string prefix,  //prefix to find the file
 
 }
 
-void transform_ri(int nroe,            //nr of electrons
-                  int nroao,           //nr of bsf in aobasis
-                  int naux_2,          //nr of aux basis functions
-                  double* MOs,         //orbitals for transformation
-                  double* BPQ,          //input - calculated b^Q_pq
-                  double* Bia)         //output - transformed array containing mointegrals)
+void transform_ri(systeminfo* sysinfo, OEints* onemats,pHF* postHF)
 {
+    int nroe  = sysinfo->nroe;            //nr of electrons
+    int nroao = sysinfo->nroao;           //nr of bsf in aobasis
+    int naux_2 = sysinfo->naux_2;          //nr of aux basis functions
+    double* MOs = onemats->MOs;         //orbitals for transformation
+    double* BPQ = postHF->BPQ;          //input - calculated b^Q_pq
+    double* Bia = postHF->Bia;         //output - transformed array containing mointegrals)
+
     int nocc = nroe/2;
     int nvir = nroao-nroe/2;
     double* BiQ = new double[naux_2*nocc*nroao];

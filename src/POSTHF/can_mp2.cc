@@ -50,12 +50,13 @@ void run_canonical_mp2(systeminfo* sysinfo,pHF *postHF)             //Fock Matri
 
 
 
-void run_canonical_mp2_ri(int nroe,         //Number of Electrons
-                          int nroao,        //Nr of bsf in orbital basis
-                          int naux_2,       //Nr of bsf in ri-basis
-                          double* Bia,      //tranformed intergals
-                          double* FMo)      //Fock Matrix in MO Basis
+void run_canonical_mp2_ri(systeminfo* sysinfo,pHF* postHF)
 {
+    int nroe = sysinfo->nroe;
+    int nroao = sysinfo->nroao;
+    int naux_2 = sysinfo->naux_2;
+    double* Bia = postHF->Bia;
+    double* FMo = postHF->FMo;
 
     int nocc = nroe/2;
     int nvir = nroao-nroe/2;
