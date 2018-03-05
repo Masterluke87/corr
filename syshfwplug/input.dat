@@ -10,9 +10,8 @@ plugin_load("./syshfwplug.so")
 
 
 molecule mymol {
-O
-H 1 1.1
-H 1 1.1 2 104
+H -1.0 0.0 0.0
+H  0.0 0.0 0.0 
 symmetry c1
 }
 

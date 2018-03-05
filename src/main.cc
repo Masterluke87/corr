@@ -4,6 +4,7 @@
 #include <string>
 #include <cmath>
 #include "MATH/ops_mat.h"
+#include "UTIL/util.h"
 #include "IO/ops_io.h"
 #include "SCF/ops_rhf.h"
 #include "SCF/scf.h"
