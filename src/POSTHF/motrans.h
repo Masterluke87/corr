@@ -1,7 +1,7 @@
 #include "../IO/ops_io.h"
 
 
-
+void MOtrans_mod(systeminfo *sysinfo,OEints* onemats,TEints *twomats,pHF* postHF);
 void MOtrans(systeminfo *sysinfo,OEints* onemats,TEints *twomats,pHF* postHF);
 double calc_mo2int_bf(int i, int j, int k, int l, int nroao, double* MOs,
                       long long int nrofint, long long int* sortcount, double* intval,

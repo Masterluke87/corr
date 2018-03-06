@@ -20,6 +20,7 @@
 #include <lapacke.h>
 
 
+
 #define PWIDTH_L 12
 #define PWIDTH_R 16
 
@@ -133,7 +134,7 @@ int main(int argc, char const *argv[]) {
     {
 
         double trafo_start = omp_get_wtime();
-        MOtrans(sysinfo,onemats,twomats,postHF);
+        MOtrans_mod(sysinfo,onemats,twomats,postHF);
 
 
 
@@ -168,9 +169,7 @@ int main(int argc, char const *argv[]) {
 
 
 
-    delete[] twomats->intval;
-    delete[] twomats->intnums;
-    delete   twomats;
+
 
     ccsd_ur(sysinfo,onemats,postHF);
 

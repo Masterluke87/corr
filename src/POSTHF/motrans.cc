@@ -5,6 +5,153 @@
 #include <string.h>
 #include "motrans.h"
 
+
+void MOtrans_mod(systeminfo *sysinfo,OEints* onemats,TEints *twomats,pHF* postHF){
+    double* MOs              = onemats->MOs;
+    int nroao                = sysinfo->nroao;
+    long long int nrofint    = sysinfo->nrofint;
+    long long int* sortcount = twomats->sortcount;
+    double* intval           = twomats->intval;
+    unsigned short* intnums  = twomats->intnums;
+
+    long long int kstep = nroao;
+    long long int jstep = nroao*kstep;
+    long long int istep = nroao*jstep;
+
+    /* one index at a time algo */
+    long long int prec_mem = (long long int) nroao*(long long int) nroao* (long long int) nroao* (long long int) nroao;
+    // (ij|kl) <- (ab|cd)
+    double* I_ibcd   = new double[nroao*nroao*nroao*nroao];
+    int off_i;
+
+    std::cout << "\nMOTRANS:\n-------" << '\n';
+    std::cout << "MOtrans: Need "<<2*prec_mem/1024/1024<<" MB\n";
+    std::cout << "AO-Integrals will be deleted, frees " <<sysinfo->nrofint/1024/1024<<"MB\n";
+
+    for(int i=0;i<nroao;i++){
+        off_i = i*nroao;
+        for(long long int x = 0; x < sortcount[0]; x++) {
+            //                     b=1            c=2                  d=3                                a=0   (Transfromation over a!!)
+             I_ibcd[i*istep+intnums[x*4+1]*jstep+intnums[x*4+2]*kstep+intnums[x*4+3]] += MOs[off_i+intnums[x*4+0]]*intval[x]; //(1)    (ab|cd)
+
+        }
+        //Cai(aa|cc) & Cci(cc|aa)
+        for(long long int x = sortcount[0]; x < sortcount[1]; x++) {
+            //                     b=1            c=2                  d=3                                a=0   (Transfromation over a!!)
+             I_ibcd[i*istep+intnums[x*4+1]*jstep+intnums[x*4+2]*kstep+intnums[x*4+3]] += MOs[off_i+intnums[x*4+0]]*intval[x]; //(1)    (ab|cd)
+             I_ibcd[i*istep+intnums[x*4+2]*jstep+intnums[x*4+0]*kstep+intnums[x*4+1]] += MOs[off_i+intnums[x*4+2]]*intval[x]; //(5)    (cd|ab)
+        }
+        //  (ab|ab) |  C-0 | 123
+        //  (ab|ba) |  C-0 | 132
+        //  (ba|ab) |  C-1 | 023
+        //  (ba|ba) |  C-1 | 032
+        for(long long int x = sortcount[1]; x < sortcount[2]; x++) {
+            //                     b=1            c=2                  d=3                                a=0   (Transfromation over a!!)
+            I_ibcd[i*istep+intnums[x*4+1]*jstep+intnums[x*4+2]*kstep+intnums[x*4+3]] += MOs[off_i+intnums[x*4+0]]*intval[x]; //(1)    (ab|cd)
+            I_ibcd[i*istep+intnums[x*4+1]*jstep+intnums[x*4+3]*kstep+intnums[x*4+2]] += MOs[off_i+intnums[x*4+0]]*intval[x]; //(2)    (ab|dc)
+            I_ibcd[i*istep+intnums[x*4+0]*jstep+intnums[x*4+2]*kstep+intnums[x*4+3]] += MOs[off_i+intnums[x*4+1]]*intval[x]; //(3)    (ba|cd)
+            I_ibcd[i*istep+intnums[x*4+0]*jstep+intnums[x*4+3]*kstep+intnums[x*4+2]] += MOs[off_i+intnums[x*4+1]]*intval[x]; //(4)    (ba|dc)
+        }
+        // (aa|cd) | C-0 | 0123
+        // (aa|dc) | C-0 | 0132
+        // (cd|aa) | C-2 | 2301
+        // (dc|aa) | C-3 | 3201
+        for(long long int x = sortcount[2]; x < sortcount[3]; x++) {
+            //                     b=1            c=2                  d=3                                a=0   (Transfromation over a!!)
+            I_ibcd[i*istep+intnums[x*4+1]*jstep+intnums[x*4+2]*kstep+intnums[x*4+3]] += MOs[off_i+intnums[x*4+0]]*intval[x]; //(1)    (ab|cd)
+            I_ibcd[i*istep+intnums[x*4+1]*jstep+intnums[x*4+3]*kstep+intnums[x*4+2]] += MOs[off_i+intnums[x*4+0]]*intval[x]; //(2)    (ab|dc)
+            I_ibcd[i*istep+intnums[x*4+3]*jstep+intnums[x*4+0]*kstep+intnums[x*4+1]] += MOs[off_i+intnums[x*4+2]]*intval[x]; //(5)    (cd|ab)
+            I_ibcd[i*istep+intnums[x*4+2]*jstep+intnums[x*4+0]*kstep+intnums[x*4+1]] += MOs[off_i+intnums[x*4+3]]*intval[x]; //(6)    (dc|ab)
+        }
+        // (ab|cd) | C-0 | 0123
+        // (ab|dc) | C-0 | 0132
+        // (ba|cd) | C-1 | 1023
+        // (ba|dc) | C-1 | 1032
+        // (cd|ab) | C-2 | 2301
+        // (cd|ba) | C-2 | 2310
+        // (dc|ab) | C-3 | 3201
+        // (dc|ba) | C-3 | 3210
+
+        for(long long int x = sortcount[3]; x < nrofint; x++) {
+            //                     b=1            c=2                  d=3                                a=0   (Transfromation over a!!)
+            I_ibcd[i*istep+intnums[x*4+1]*jstep+intnums[x*4+2]*kstep+intnums[x*4+3]] += MOs[off_i+intnums[x*4+0]]*intval[x]; //(1)    (ab|cd)
+            I_ibcd[i*istep+intnums[x*4+1]*jstep+intnums[x*4+3]*kstep+intnums[x*4+2]] += MOs[off_i+intnums[x*4+0]]*intval[x]; //(2)    (ab|dc)
+            I_ibcd[i*istep+intnums[x*4+0]*jstep+intnums[x*4+2]*kstep+intnums[x*4+3]] += MOs[off_i+intnums[x*4+1]]*intval[x]; //(3)    (ba|cd)
+            I_ibcd[i*istep+intnums[x*4+0]*jstep+intnums[x*4+3]*kstep+intnums[x*4+2]] += MOs[off_i+intnums[x*4+1]]*intval[x]; //(4)    (ba|dc)
+            I_ibcd[i*istep+intnums[x*4+3]*jstep+intnums[x*4+0]*kstep+intnums[x*4+1]] += MOs[off_i+intnums[x*4+2]]*intval[x]; //(5)    (cd|ab)
+            I_ibcd[i*istep+intnums[x*4+3]*jstep+intnums[x*4+1]*kstep+intnums[x*4+0]] += MOs[off_i+intnums[x*4+2]]*intval[x]; //(6)    (dc|ab)
+            I_ibcd[i*istep+intnums[x*4+2]*jstep+intnums[x*4+0]*kstep+intnums[x*4+1]] += MOs[off_i+intnums[x*4+3]]*intval[x]; //(7)    (cd|ba)
+            I_ibcd[i*istep+intnums[x*4+2]*jstep+intnums[x*4+1]*kstep+intnums[x*4+0]] += MOs[off_i+intnums[x*4+3]]*intval[x]; //(8)    (dc|ba)
+        }
+
+    }
+    std::cout << "Done 1st index..\n";
+
+
+    //remove the two electron integrals
+    delete[] twomats->intval;
+    delete[] twomats->intnums;
+    delete   twomats;
+    //Allocate final space
+
+    postHF->prec_ints =  new double[prec_mem];
+    std::memset(postHF->prec_ints,0,prec_mem*sizeof(double));
+    //2nd index
+    //(ij|cd) <- C_b*(i|bcd)
+    for(int i=0;i<nroao;i++){
+        for(int j=0;j<nroao;j++){
+          for(int c=0;c<nroao;c++){
+              for(int d=0;d<nroao;d++){
+                    for(int b=0;b<nroao;b++)
+                        {
+                        postHF->prec_ints[i*istep + j*jstep + c*kstep + d] += MOs[j*nroao+b]*I_ibcd[i*istep + b*jstep + c*kstep + d];
+                        }
+                }
+            }
+        }
+    }
+    std::cout << "Done 2nd index..\n";
+
+    double* I_ijkd = I_ibcd;
+    std::memset(I_ijkd,0,prec_mem*sizeof(double));
+    //3rd index
+    //(ij|kd) <- C_c(ij|cd)
+    for(int i=0;i<nroao;i++){
+        for(int j=0;j<nroao;j++){
+            for(int k=0;k<nroao;k++){
+                for(int d=0;d<nroao;d++){
+                    for(int c=0;c<nroao;c++){
+                        I_ijkd[i*istep + j*jstep + k*kstep + d] += MOs[k*nroao+c]*postHF->prec_ints[i*istep + j*jstep + c*kstep + d];
+                    }
+                }
+            }
+        }
+    }
+    std::cout << "Done 3rd index..\n";
+    std::memset(postHF->prec_ints,0,nroao*nroao*nroao*nroao*sizeof(double));
+    //(ij|kl) <- C_d(ij|kd)
+    for(int i=0;i<nroao;i++){
+        for(int j=0;j<nroao;j++){
+            for(int k=0;k<nroao;k++){
+                for(int l=0;l<nroao;l++){
+                    for(int d=0;d<nroao;d++){
+                       postHF->prec_ints[i*istep + j*jstep + k*kstep + l] += MOs[l*nroao+d]*I_ijkd[i*istep + j*jstep + k*kstep + d];
+                    }
+                }
+            }
+        }
+    }
+    std::cout << "Done 4th index..\n";
+
+    delete[] I_ijkd;
+
+}
+
+
+
+
+
+
 void build_FMo(systeminfo *sysinfo,OEints* onemats, pHF* postHF)
     {
 
@@ -36,15 +183,10 @@ void MOtrans(systeminfo *sysinfo,OEints* onemats,TEints *twomats,pHF* postHF)
 {
     double* MOs              = onemats->MOs;
     int nroao                = sysinfo->nroao;
-    int nroe                 = sysinfo->nroe;
     long long int nrofint    = sysinfo->nrofint;
     long long int* sortcount = twomats->sortcount;
     double* intval           = twomats->intval;
     unsigned short* intnums  = twomats->intnums;
-    double* prec_ints;
-
-
-
 
     long long int prec_mem = (long long int) nroao*(long long int) nroao* (long long int) nroao* (long long int) nroao;
     std::cout << "Need " << prec_mem*sizeof(double) << " bytes (" << prec_mem*sizeof(double)/1024/1024 << " MB) for precalculation\n";
@@ -69,145 +211,6 @@ void MOtrans(systeminfo *sysinfo,OEints* onemats,TEints *twomats,pHF* postHF)
         std::cout << i << "\t"<<std::flush;
         if((i+1)%10==0) std::cout << "\n"<<std::flush;
     }
-    double* test  = new double[nroao*nroao*nroao*nroao];
-
-    std::memset(test,0,nroao*nroao*nroao*nroao*sizeof(double));
-
-    int off_i;
-
-    //transform first index
-    // (i|bcd) += Cia*(abcd)
-
-    for(int i=0;i<nroao;i++){
-        off_i = i*nroao;
-        for(long long int x = 0; x < sortcount[0]; x++) {
-            //                     b=1            c=2                  d=3                                a=0   (Transfromation over a!!)
-            test[i*istep+intnums[x*4+1]*jstep+intnums[x*4+2]*kstep+intnums[x*4+3]] += MOs[off_i+intnums[x*4+0]]*intval[x]; //(1)    (ab|cd)
-
-        }
-        //Cai(aa|cc) & Cci(cc|aa)
-        for(long long int x = sortcount[0]; x < sortcount[1]; x++) {
-            //                     b=1            c=2                  d=3                                a=0   (Transfromation over a!!)
-            test[i*istep+intnums[x*4+1]*jstep+intnums[x*4+2]*kstep+intnums[x*4+3]] += MOs[off_i+intnums[x*4+0]]*intval[x]; //(1)    (ab|cd)
-            test[i*istep+intnums[x*4+2]*jstep+intnums[x*4+0]*kstep+intnums[x*4+1]] += MOs[off_i+intnums[x*4+2]]*intval[x]; //(5)    (cd|ab)
-        }
-        //  (ab|ab) |  C-0 | 123
-        //  (ab|ba) |  C-0 | 132
-        //  (ba|ab) |  C-1 | 023
-        //  (ba|ba) |  C-1 | 032
-        for(long long int x = sortcount[1]; x < sortcount[2]; x++) {
-            //                     b=1            c=2                  d=3                                a=0   (Transfromation over a!!)
-            test[i*istep+intnums[x*4+1]*jstep+intnums[x*4+2]*kstep+intnums[x*4+3]] += MOs[off_i+intnums[x*4+0]]*intval[x]; //(1)    (ab|cd)
-            test[i*istep+intnums[x*4+1]*jstep+intnums[x*4+3]*kstep+intnums[x*4+2]] += MOs[off_i+intnums[x*4+0]]*intval[x]; //(2)    (ab|dc)
-            test[i*istep+intnums[x*4+0]*jstep+intnums[x*4+2]*kstep+intnums[x*4+3]] += MOs[off_i+intnums[x*4+1]]*intval[x]; //(3)    (ba|cd)
-            test[i*istep+intnums[x*4+0]*jstep+intnums[x*4+3]*kstep+intnums[x*4+2]] += MOs[off_i+intnums[x*4+1]]*intval[x]; //(4)    (ba|dc)
-        }
-        // (aa|cd) | C-0 | 0123
-        // (aa|dc) | C-0 | 0132
-        // (cd|aa) | C-2 | 2301
-        // (dc|aa) | C-3 | 3201
-        for(long long int x = sortcount[2]; x < sortcount[3]; x++) {
-            //                     b=1            c=2                  d=3                                a=0   (Transfromation over a!!)
-            test[i*istep+intnums[x*4+1]*jstep+intnums[x*4+2]*kstep+intnums[x*4+3]] += MOs[off_i+intnums[x*4+0]]*intval[x]; //(1)    (ab|cd)
-            test[i*istep+intnums[x*4+1]*jstep+intnums[x*4+3]*kstep+intnums[x*4+2]] += MOs[off_i+intnums[x*4+0]]*intval[x]; //(2)    (ab|dc)
-            test[i*istep+intnums[x*4+3]*jstep+intnums[x*4+0]*kstep+intnums[x*4+1]] += MOs[off_i+intnums[x*4+2]]*intval[x]; //(5)    (cd|ab)
-            test[i*istep+intnums[x*4+2]*jstep+intnums[x*4+0]*kstep+intnums[x*4+1]] += MOs[off_i+intnums[x*4+3]]*intval[x]; //(6)    (dc|ab)
-        }
-        // (ab|cd) | C-0 | 0123
-        // (ab|dc) | C-0 | 0132
-        // (ba|cd) | C-1 | 1023
-        // (ba|dc) | C-1 | 1032
-        // (cd|ab) | C-2 | 2301
-        // (cd|ba) | C-2 | 2310
-        // (dc|ab) | C-3 | 3201
-        // (dc|ba) | C-3 | 3210
-
-        for(long long int x = sortcount[3]; x < nrofint; x++) {
-            //                     b=1            c=2                  d=3                                a=0   (Transfromation over a!!)
-            test[i*istep+intnums[x*4+1]*jstep+intnums[x*4+2]*kstep+intnums[x*4+3]] += MOs[off_i+intnums[x*4+0]]*intval[x]; //(1)    (ab|cd)
-            test[i*istep+intnums[x*4+1]*jstep+intnums[x*4+3]*kstep+intnums[x*4+2]] += MOs[off_i+intnums[x*4+0]]*intval[x]; //(2)    (ab|dc)
-            test[i*istep+intnums[x*4+0]*jstep+intnums[x*4+2]*kstep+intnums[x*4+3]] += MOs[off_i+intnums[x*4+1]]*intval[x]; //(3)    (ba|cd)
-            test[i*istep+intnums[x*4+0]*jstep+intnums[x*4+3]*kstep+intnums[x*4+2]] += MOs[off_i+intnums[x*4+1]]*intval[x]; //(4)    (ba|dc)
-            test[i*istep+intnums[x*4+3]*jstep+intnums[x*4+0]*kstep+intnums[x*4+1]] += MOs[off_i+intnums[x*4+2]]*intval[x]; //(5)    (cd|ab)
-            test[i*istep+intnums[x*4+3]*jstep+intnums[x*4+1]*kstep+intnums[x*4+0]] += MOs[off_i+intnums[x*4+2]]*intval[x]; //(6)    (dc|ab)
-            test[i*istep+intnums[x*4+2]*jstep+intnums[x*4+0]*kstep+intnums[x*4+1]] += MOs[off_i+intnums[x*4+3]]*intval[x]; //(7)    (cd|ba)
-            test[i*istep+intnums[x*4+2]*jstep+intnums[x*4+1]*kstep+intnums[x*4+0]] += MOs[off_i+intnums[x*4+3]]*intval[x]; //(8)    (dc|ba)
-        }
-
-    }
-
-    //(ij|cd) <- C_b*(i|bcd)
-    for(int i=0;i<nroao;i++)
-        for(int j=0;j<nroao;j++)
-            for(int b=0;b<nroao;b++)
-                for(int c=0;c<nroao;c++)
-                    for(int d=0;d<nroao;d++)
-                    {
-                        test[i*istep + j*jstep + c*kstep + d] += MOs[j*nroao+b]*test[i*istep + b*jstep + c*kstep + d];
-                    }
-    //(ij|kd) <- C_c(ij|cd)
-    for(int i=0;i<nroao;i++)
-        for(int j=0;j<nroao;j++)
-            for(int k=0;k<nroao;k++)
-                for(int c=0;c<nroao;c++)
-                    for(int d=0;d<nroao;d++){
-                        test[i*istep + j*jstep + k*kstep + d] += MOs[k*nroao+c]*test[i*istep + j*jstep + c*kstep + d];
-                    }
-    //(ij|kl) <- C_d(ij|kd)
-    for(int i=0;i<nroao;i++)
-        for(int j=0;j<nroao;j++)
-            for(int k=0;k<nroao;k++)
-                for(int l=0;l<nroao;l++)
-                    for(int d=0;d<nroao;d++){
-                        test[i*istep + j*jstep + k*kstep + l] += MOs[l*nroao+d]*test[i*istep + j*jstep + k*kstep + d];
-                    }
-
-    for (int i=0;i<nroao;i++)
-    {
-        std::cout<<test[i*istep+i*jstep+i*kstep+i]<<" "<<postHF->prec_ints[i*istep+i*jstep+i*kstep+i]<<std::endl;
-    }
-
-
-
-
-
-
-
-
-        //PERM_15
-
-        //PERM_1234
-        /*
-
-
-        //PERM_1256
-        for(long long int x = sortcount[2]; x < sortcount[3]; x++) {
-            //                     b=1            c=2                  d=3                                a=0   (Transfromation over a!!)
-            i____Trans[intnums[x*4+1]+intnums[x*4+2]*fac_c+intnums[x*4+3]*fac_d] += MOs[off_i+intnums[x*4+0]]*intval[x]; //(1)    (ab|cd)
-            i____Trans[intnums[x*4+1]+intnums[x*4+3]*fac_c+intnums[x*4+2]*fac_d] += MOs[off_i+intnums[x*4+0]]*intval[x]; //(2)    (ab|dc)
-            i____Trans[intnums[x*4+3]+intnums[x*4+0]*fac_c+intnums[x*4+1]*fac_d] += MOs[off_i+intnums[x*4+2]]*intval[x]; //(5)    (cd|ab)
-            i____Trans[intnums[x*4+2]+intnums[x*4+0]*fac_c+intnums[x*4+1]*fac_d] += MOs[off_i+intnums[x*4+3]]*intval[x]; //(6)    (dc|ab)
-        }
-
-
-        //PERM_ALL
-        for(long long int x = sortcount[3]; x < nrofint; x++) {
-            //                     b=1            c=2                  d=3                                a=0   (Transfromation over a!!)
-            i____Trans[intnums[x*4+1]+intnums[x*4+2]*fac_c+intnums[x*4+3]*fac_d] += MOs[off_i+intnums[x*4+0]]*intval[x]; //(1)    (ab|cd)
-            i____Trans[intnums[x*4+1]+intnums[x*4+3]*fac_c+intnums[x*4+2]*fac_d] += MOs[off_i+intnums[x*4+0]]*intval[x]; //(2)    (ab|dc)
-            i____Trans[intnums[x*4+0]+intnums[x*4+2]*fac_c+intnums[x*4+3]*fac_d] += MOs[off_i+intnums[x*4+1]]*intval[x]; //(3)    (ba|cd)
-            i____Trans[intnums[x*4+0]+intnums[x*4+3]*fac_c+intnums[x*4+2]*fac_d] += MOs[off_i+intnums[x*4+1]]*intval[x]; //(4)    (ba|dc)
-            i____Trans[intnums[x*4+3]+intnums[x*4+0]*fac_c+intnums[x*4+1]*fac_d] += MOs[off_i+intnums[x*4+2]]*intval[x]; //(5)    (cd|ab)
-            i____Trans[intnums[x*4+2]+intnums[x*4+0]*fac_c+intnums[x*4+1]*fac_d] += MOs[off_i+intnums[x*4+3]]*intval[x]; //(6)    (dc|ab)
-            i____Trans[intnums[x*4+3]+intnums[x*4+1]*fac_c+intnums[x*4+0]*fac_d] += MOs[off_i+intnums[x*4+2]]*intval[x]; //(7)    (cd|ba)
-            i____Trans[intnums[x*4+2]+intnums[x*4+1]*fac_c+intnums[x*4+0]*fac_d] += MOs[off_i+intnums[x*4+3]]*intval[x]; //(8)    (dc|ba)
-
-}
-
-
-    */
-
-
 }
 
 
