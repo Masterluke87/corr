@@ -7,6 +7,7 @@
 struct pHF{
     double* FMo;
     double* prec_ints;
+    double* ints_so;
     double* BPQ;
     double* Bia;
 };

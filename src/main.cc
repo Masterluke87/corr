@@ -135,6 +135,9 @@ int main(int argc, char const *argv[]) {
         double trafo_start = omp_get_wtime();
         MOtrans(sysinfo,onemats,twomats,postHF);
 
+
+
+
         double trafo_end = omp_get_wtime();
         double mp2_start = omp_get_wtime();
         run_canonical_mp2(sysinfo,postHF);
@@ -163,6 +166,11 @@ int main(int argc, char const *argv[]) {
         rimp2_end = omp_get_wtime();
      } //end RI-MP2
 
+
+
+    delete[] twomats->intval;
+    delete[] twomats->intnums;
+    delete   twomats;
 
     ccsd_ur(sysinfo,onemats,postHF);
 
