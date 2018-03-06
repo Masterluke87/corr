@@ -262,7 +262,6 @@ void ccsd_build_intermediates(cc_helper* CC,cc_intermediates *CC_int,pHF* postHF
 }
 
 
-
 void ccsd_update_T1(cc_helper* CC,cc_intermediates *CC_int,pHF* postHF){
     int nvir = CC->nvir;
     int nocc = CC->nocc;
@@ -554,7 +553,6 @@ void ccsd_ur(systeminfo* sysinfo,OEints* onemats,pHF* postHF){
 
 
     calc_ints_so(CC,postHF);
-
     allocate_amplitudes_intermediates(CC,CC_int);
     form_fock(CC,postHF);
     calc_e_check(CC,postHF);

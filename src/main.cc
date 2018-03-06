@@ -140,7 +140,7 @@ int main(int argc, char const *argv[]) {
 
         double trafo_end = omp_get_wtime();
         double mp2_start = omp_get_wtime();
-        run_canonical_mp2(sysinfo,postHF);
+       // run_canonical_mp2(sysinfo,postHF);
         double mp2_end   = omp_get_wtime();
     }
 
