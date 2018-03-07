@@ -370,12 +370,12 @@ void ccsd_update_T2(cc_helper* CC,cc_intermediates *CC_int,pHF* postHF){
     int idx = 0;
 
 
+
+
     for(int i=0;i<nocc;i++)
-        for(int j=0;j<nocc;j++)
+        for(int j=0;j<=i;j++)
             for(int a=0;a<nvir;a++)
-                for(int b=0;b<nvir;b++){
-
-
+                for(int b=0;b<=a;b++){
 
                     tmpa = a + nocc;
                     tmpb = b + nocc;
@@ -383,10 +383,18 @@ void ccsd_update_T2(cc_helper* CC,cc_intermediates *CC_int,pHF* postHF){
                     idx = i*Ti_step+j*Tj_step+a*Ta_step+b;
 
                     T2n[idx] = ints_so[i*istep + j*jstep + tmpa*kstep + tmpb];
+
                     for(int e=0;e<nvir;e++)
                     {
                         s0 = 0.0;
                         s1 = 0.0;
+
+                        tmpb = b+nocc;
+                        tmpa = a+nocc;
+                        tmpe = e+nocc;
+
+                        T2n[idx] += (T1[i*nvir+e] * ints_so[tmpa*istep + tmpb*jstep + tmpe*kstep + j] -
+                                                                 T1[j*nvir+e] * ints_so[tmpa*istep + tmpb*jstep + tmpe*kstep + i]);
                         for(int m=0;m<nocc;m++){
                             s0 += -0.5*(T1[m*nvir+b] * Fme[m*nvir+e]);
                             s1 += -0.5*(T1[m*nvir+a] * Fme[m*nvir+e]);
@@ -394,83 +402,72 @@ void ccsd_update_T2(cc_helper* CC,cc_intermediates *CC_int,pHF* postHF){
                         s0 += Fae[b*nvir+e];
                         s1 += Fae[a*nvir+e];
                         T2n[idx] += T2[i*Ti_step+j*Tj_step+a*Ta_step+e]*s0 - T2[i*Ti_step+j*Tj_step+b*Ta_step+e]*s1;
+
+
+
+                        a_step = nvir*nvir*nvir;
+                        b_step = nvir*nvir;
+                        e_step = nvir;
+
+                        for(int f=0;f<nvir;f++){
+                            T2n[idx] += 0.5*tau[i*Ti_step+j*Tj_step+e*Ta_step+f]*Wabef[a*a_step+b*b_step+e*e_step+f];
+                        }
+
+
                     }
 
                     for(int m=0;m<nocc;m++)
                     {
                         s0 = 0.0;
                         s1 = 0.0;
+
+                        m_step = nocc*nocc*nocc;
+                        n_step = nocc*nocc;
+                        i_step = nocc;
+                        for(int n=0;n<nocc;n++){
+                            T2n[idx] += 0.5*tau[m*Ti_step+n*Tj_step+a*Ta_step+b]*Wmnij[m*m_step+n*n_step+i*i_step+j];
+                        }
+                        m_step = nvir*nvir*nocc;
+                        b_step = nvir*nocc;
+                        e_step = nocc;
                         for(int e=0;e<nvir;e++){
                             s0 += 0.5*(T1[j*nvir+e]*Fme[m*nvir+e]);
                             s1 += 0.5*(T1[i*nvir+e]*Fme[m*nvir+e]);
+                            tmpb = b+nocc;
+                            tmpa = a+nocc;
+                            tmpe = e+nocc;
+                            T2n[idx] += (T2[i*Ti_step+m*Tj_step+a*Ta_step+e] * Wmbej[m*m_step+b*b_step+e*e_step+j]-T1[i*nvir+e]*T1[m*nvir+a]*ints_so[tmpb*istep + m*jstep +j*kstep+ tmpe]
+                                        -T2[i*Ti_step+m*Tj_step+b*Ta_step+e] * Wmbej[m*m_step+a*b_step+e*e_step+j]+T1[i*nvir+e]*T1[m*nvir+b]*ints_so[tmpa*istep + m*jstep +j*kstep+ tmpe]
+                                        -T2[j*Ti_step+m*Tj_step+a*Ta_step+e] * Wmbej[m*m_step+b*b_step+e*e_step+i]+T1[j*nvir+e]*T1[m*nvir+a]*ints_so[tmpb*istep + m*jstep +i*kstep+ tmpe]
+                                        +T2[j*Ti_step+m*Tj_step+b*Ta_step+e] * Wmbej[m*m_step+a*b_step+e*e_step+i]-T1[j*nvir+e]*T1[m*nvir+b]*ints_so[tmpa*istep + m*jstep +i*kstep+ tmpe]);
+
                         }
+                        tmpb = b+nocc;
+                        tmpa = a+nocc;
+                        T2n[idx] -= (T1[m*nvir+a]*ints_so[m*istep + tmpb*jstep + i*kstep + j])-
+                                                                (T1[m*nvir+b]*ints_so[m*istep + tmpa*jstep + i*kstep + j]);
                         s0 += Fmi[m*nocc+j];
                         s1 += Fmi[m*nocc+i];
                         T2n[idx] -= (T2[i*Ti_step+m*Tj_step+a*Ta_step+b]*s0 - T2[j*Ti_step+m*Tj_step+a*Ta_step+b]*s1);
 
                     }
 
-                    m_step = nocc*nocc*nocc;
-                    n_step = nocc*nocc;
-                    i_step = nocc;
-
-                  //  T2n[i*Ti_step+j*Tj_step+a*Ta_step+b] += 0.5 * cblas_ddot(nocc*nocc,&tau[a*Ta_step+b],Tj_step,&Wmnij[i*i_step+j],n_step);
 
 
-                    for(int m=0;m<nocc;m++)
-                        for(int n=0;n<nocc;n++){
-                            T2n[idx] += 0.5*tau[m*Ti_step+n*Tj_step+a*Ta_step+b]*Wmnij[m*m_step+n*n_step+i*i_step+j];
-                        }
-
-
-                    a_step = nvir*nvir*nvir;
-                    b_step = nvir*nvir;
-                    e_step = nvir;
                     //T2n[i*Ti_step+j*Tj_step+a*Ta_step+b] += 0.5 * cblas_ddot(nvir*nvir,&tau[i*Ti_step+j*Tj_step],1,&Wabef[a*a_step+b*b_step],1);
 
-                    for(int e=0;e<nvir;e++)
-                        for(int f=0;f<nvir;f++){
-                            T2n[idx] += 0.5*tau[i*Ti_step+j*Tj_step+e*Ta_step+f]*Wabef[a*a_step+b*b_step+e*e_step+f];
-                        }
 
-                    m_step = nvir*nvir*nocc;
-                    b_step = nvir*nocc;
-                    e_step = nocc;
 
-                    for(int m=0;m<nocc;m++)
 
-                        for(int e=0;e<nvir;e++){
-                            tmpb = b+nocc;
-                            tmpa = a+nocc;
-                            tmpe = e+nocc;
-                            T2n[idx] += (T2[i*Ti_step+m*Tj_step+a*Ta_step+e] * Wmbej[m*m_step+b*b_step+e*e_step+j]-T1[i*nvir+e]*T1[m*nvir+a]*ints_so[m*istep + tmpb*jstep + tmpe*kstep + j]
-                                                                    -T2[i*Ti_step+m*Tj_step+b*Ta_step+e] * Wmbej[m*m_step+a*b_step+e*e_step+j]+T1[i*nvir+e]*T1[m*nvir+b]*ints_so[m*istep + tmpa*jstep + tmpe*kstep + j]
-                                                                    -T2[j*Ti_step+m*Tj_step+a*Ta_step+e] * Wmbej[m*m_step+b*b_step+e*e_step+i]+T1[j*nvir+e]*T1[m*nvir+a]*ints_so[m*istep + tmpb*jstep + tmpe*kstep + i]
-                                                                    +T2[j*Ti_step+m*Tj_step+b*Ta_step+e] * Wmbej[m*m_step+a*b_step+e*e_step+i]-T1[j*nvir+e]*T1[m*nvir+b]*ints_so[m*istep + tmpa*jstep + tmpe*kstep + i]);
 
-                            /*
-                            T2n[i*Ti_step+j*Tj_step+a*Ta_step+b] +=((T2[i*Ti_step+m*Tj_step+a*Ta_step+e] * Wmbej[m*m_step+b*b_step+e*e_step+j]-T1[i*nvir+e]*T1[m*nvir+a]*ints_so[m*istep + tmpb*jstep + tmpe*kstep + j])-
-                                                                    (T2[i*Ti_step+m*Tj_step+b*Ta_step+e] * Wmbej[m*m_step+a*b_step+e*e_step+j]-T1[i*nvir+e]*T1[m*nvir+b]*ints_so[m*istep + tmpa*jstep + tmpe*kstep + j]))-
-                                                                   ((T2[j*Ti_step+m*Tj_step+a*Ta_step+e] * Wmbej[m*m_step+b*b_step+e*e_step+i]-T1[j*nvir+e]*T1[m*nvir+a]*ints_so[m*istep + tmpb*jstep + tmpe*kstep + i])-
-                                                                    (T2[j*Ti_step+m*Tj_step+b*Ta_step+e] * Wmbej[m*m_step+a*b_step+e*e_step+i]-T1[j*nvir+e]*T1[m*nvir+b]*ints_so[m*istep + tmpa*jstep + tmpe*kstep + i]));
-                                                                    */
-                     }
 
-                    for(int e=0;e<nvir;e++){
-                        tmpb = b+nocc;
-                        tmpa = a+nocc;
-                        tmpe = e+nocc;
-                        T2n[idx] += (T1[i*nvir+e] * ints_so[tmpa*istep + tmpb*jstep + tmpe*kstep + j] -
-                                                                 T1[j*nvir+e] * ints_so[tmpa*istep + tmpb*jstep + tmpe*kstep + i]);
-                    }
-                    for(int m=0;m<nocc;m++){
-                        tmpb = b+nocc;
-                        tmpa = a+nocc;
-                        T2n[idx] -= (T1[m*nvir+a]*ints_so[m*istep + tmpb*jstep + i*kstep + j])-
-                                                                (T1[m*nvir+b]*ints_so[m*istep + tmpa*jstep + i*kstep + j]);
-                    }
+                T2n[i*Ti_step+j*Tj_step+a*Ta_step+b]/=(f[i*norb+i]+f[j*norb+j]-f[(nocc+a)*norb+(nocc+a)]-f[(nocc+b)*norb + nocc+b]);
 
-                T2n[idx]/=(f[i*norb+i]+f[j*norb+j]-f[(nocc+a)*norb+(nocc+a)]-f[(nocc+b)*norb + nocc+b]);
+                T2n[j*Ti_step+i*Tj_step+a*Ta_step+b] = -T2n[i*Ti_step+j*Tj_step+a*Ta_step+b];
+                T2n[i*Ti_step+j*Tj_step+b*Ta_step+a] = -T2n[i*Ti_step+j*Tj_step+a*Ta_step+b];
+                T2n[j*Ti_step+i*Tj_step+b*Ta_step+a] = T2n[i*Ti_step+j*Tj_step+a*Ta_step+b];
+
+
 
     }
 }

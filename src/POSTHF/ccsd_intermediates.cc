@@ -154,9 +154,9 @@ void build_Wmnij(cc_helper* CC,cc_intermediates* CC_int,pHF* postHF){
 
 
     for(int m=0;m<nocc;m++)
-        for(int n=0;n<nocc;n++)
+        for(int n=0;n<=m;n++)
             for(int i=0;i<nocc;i++)
-                for(int j=0;j<nocc;j++){
+                for(int j=0;j<=i;j++){
                     Wmnij[m*m_step+n*n_step+i*i_step+j] = ints_so[m*istep + n*jstep + i*kstep + j];
                     for(int e=0;e<nvir;e++){
                         tmpe = e+nocc;
@@ -170,6 +170,9 @@ void build_Wmnij(cc_helper* CC,cc_intermediates* CC_int,pHF* postHF){
                             tmpf = f+nocc;
                             Wmnij[m*m_step+n*n_step+i*i_step+j] += 0.25*tau[i*Ti_step+j*Tj_step + e*Ta_step + f]*ints_so[m*istep + n*jstep + tmpe*kstep + tmpf];
                         }
+                    Wmnij[n*m_step+m*n_step+i*i_step+j] = - Wmnij[m*m_step+n*n_step+i*i_step+j];
+                    Wmnij[m*m_step+n*n_step+j*i_step+i] = - Wmnij[m*m_step+n*n_step+i*i_step+j];
+                    Wmnij[n*m_step+m*n_step+j*i_step+i] =   Wmnij[m*m_step+n*n_step+i*i_step+j];
 
                 }
 
@@ -199,9 +202,9 @@ void build_Wabef(cc_helper* CC,cc_intermediates* CC_int,pHF* postHF){
     int Ti_step = Tj_step * nocc;
     int tmpe,tmpf,tmpa,tmpb;
     for(int a=0;a<nvir;a++)
-        for(int b=0;b<nvir;b++)
+        for(int b=0;b<=a;b++)
             for(int e=0;e<nvir;e++)
-                for(int f=0;f<nvir;f++)
+                for(int f=0;f<=e;f++)
                 {
                     tmpa = a+nocc;
                     tmpb = b+nocc;
@@ -224,6 +227,10 @@ void build_Wabef(cc_helper* CC,cc_intermediates* CC_int,pHF* postHF){
                             tmpf = f+nocc;
                             Wabef[a*a_step + b*b_step + e*e_step +f] += 0.25*tau[m*Ti_step+n*Tj_step + a*Ta_step + b]*ints_so[m*istep + n*jstep + tmpe*kstep + tmpf];
                         }
+                     Wabef[b*a_step + a*b_step + e*e_step +f] =  -Wabef[a*a_step + b*b_step + e*e_step +f];
+                     Wabef[a*a_step + b*b_step + f*e_step +e] =  -Wabef[a*a_step + b*b_step + e*e_step +f];
+                     Wabef[b*a_step + a*b_step + f*e_step +e] =   Wabef[a*a_step + b*b_step + e*e_step +f];
+
 
                 }
 
