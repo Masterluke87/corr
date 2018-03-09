@@ -262,6 +262,9 @@ void build_Wmbej(cc_helper* CC, cc_intermediates *CC_int, pHF* postHF){
     int tmpe,tmpf,tmpa,tmpb;
 
 
+
+
+
     for (int m=0;m<nocc;m++)
         for(int b=0;b<nvir;b++)
             for(int e=0;e<nvir; e++)

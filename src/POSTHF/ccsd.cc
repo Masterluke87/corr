@@ -372,6 +372,16 @@ void ccsd_update_T2(cc_helper* CC,cc_intermediates *CC_int,pHF* postHF){
 
 
 
+
+
+
+    cblas_dgemm(CblasRowMajor,CblasTrans,CblasNoTrans,nocc*nocc,nvir*nvir,nocc*nocc,0.5,Wmnij,nocc*nocc,tau,nvir*nvir,0.0,T2n,nvir*nvir);
+    cblas_dgemm(CblasRowMajor,CblasNoTrans,CblasTrans,nocc*nocc,nvir*nvir,nvir*nvir,0.5,tau,nvir*nvir,Wabef,nvir*nvir,1.0,T2n,nvir*nvir);
+
+
+
+
+
     for(int i=0;i<nocc;i++)
         for(int j=0;j<=i;j++)
             for(int a=0;a<nvir;a++)
@@ -382,7 +392,7 @@ void ccsd_update_T2(cc_helper* CC,cc_intermediates *CC_int,pHF* postHF){
 
                     idx = i*Ti_step+j*Tj_step+a*Ta_step+b;
 
-                    T2n[idx] = ints_so[i*istep + j*jstep + tmpa*kstep + tmpb];
+                    T2n[idx] += ints_so[i*istep + j*jstep + tmpa*kstep + tmpb];
 
                     for(int e=0;e<nvir;e++)
                     {
@@ -409,9 +419,6 @@ void ccsd_update_T2(cc_helper* CC,cc_intermediates *CC_int,pHF* postHF){
                         b_step = nvir*nvir;
                         e_step = nvir;
 
-                        for(int f=0;f<nvir;f++){
-                            T2n[idx] += 0.5*tau[i*Ti_step+j*Tj_step+e*Ta_step+f]*Wabef[a*a_step+b*b_step+e*e_step+f];
-                        }
 
 
                     }
@@ -421,12 +428,6 @@ void ccsd_update_T2(cc_helper* CC,cc_intermediates *CC_int,pHF* postHF){
                         s0 = 0.0;
                         s1 = 0.0;
 
-                        m_step = nocc*nocc*nocc;
-                        n_step = nocc*nocc;
-                        i_step = nocc;
-                        for(int n=0;n<nocc;n++){
-                            T2n[idx] += 0.5*tau[m*Ti_step+n*Tj_step+a*Ta_step+b]*Wmnij[m*m_step+n*n_step+i*i_step+j];
-                        }
                         m_step = nvir*nvir*nocc;
                         b_step = nvir*nocc;
                         e_step = nocc;
@@ -436,10 +437,14 @@ void ccsd_update_T2(cc_helper* CC,cc_intermediates *CC_int,pHF* postHF){
                             tmpb = b+nocc;
                             tmpa = a+nocc;
                             tmpe = e+nocc;
-                            T2n[idx] += (T2[i*Ti_step+m*Tj_step+a*Ta_step+e] * Wmbej[m*m_step+b*b_step+e*e_step+j]-T1[i*nvir+e]*T1[m*nvir+a]*ints_so[tmpb*istep + m*jstep +j*kstep+ tmpe]
-                                        -T2[i*Ti_step+m*Tj_step+b*Ta_step+e] * Wmbej[m*m_step+a*b_step+e*e_step+j]+T1[i*nvir+e]*T1[m*nvir+b]*ints_so[tmpa*istep + m*jstep +j*kstep+ tmpe]
-                                        -T2[j*Ti_step+m*Tj_step+a*Ta_step+e] * Wmbej[m*m_step+b*b_step+e*e_step+i]+T1[j*nvir+e]*T1[m*nvir+a]*ints_so[tmpb*istep + m*jstep +i*kstep+ tmpe]
-                                        +T2[j*Ti_step+m*Tj_step+b*Ta_step+e] * Wmbej[m*m_step+a*b_step+e*e_step+i]-T1[j*nvir+e]*T1[m*nvir+b]*ints_so[tmpa*istep + m*jstep +i*kstep+ tmpe]);
+                            T2n[idx] += (T2[i*Ti_step+m*Tj_step+a*Ta_step+e] * Wmbej[m*m_step+b*b_step+e*e_step+j]
+                                         -T1[i*nvir+e]*T1[m*nvir+a]*ints_so[tmpb*istep + m*jstep +j*kstep+ tmpe]
+                                         -T2[i*Ti_step+m*Tj_step+b*Ta_step+e] * Wmbej[m*m_step+a*b_step+e*e_step+j]
+                                         +T1[i*nvir+e]*T1[m*nvir+b]*ints_so[tmpa*istep + m*jstep +j*kstep+ tmpe]
+                                         -T2[j*Ti_step+m*Tj_step+a*Ta_step+e] * Wmbej[m*m_step+b*b_step+e*e_step+i]
+                                         +T1[j*nvir+e]*T1[m*nvir+a]*ints_so[tmpb*istep + m*jstep +i*kstep+ tmpe]
+                                         +T2[j*Ti_step+m*Tj_step+b*Ta_step+e] * Wmbej[m*m_step+a*b_step+e*e_step+i]
+                                         -T1[j*nvir+e]*T1[m*nvir+b]*ints_so[tmpa*istep + m*jstep +i*kstep+ tmpe]);
 
                         }
                         tmpb = b+nocc;
