@@ -6,6 +6,22 @@
 #include "motrans.h"
 
 
+void MOtrans_mod_sym(systeminfo *sysinfo,OEints* onemats,TEints *twomats,pHF* postHF){
+    double* MOs              = onemats->MOs;
+    int nroao                = sysinfo->nroao;
+    long long int nrofint    = sysinfo->nrofint;
+    long long int* sortcount = twomats->sortcount;
+    double* intval           = twomats->intval;
+    unsigned short* intnums  = twomats->intnums;
+
+    long long int kstep = nroao;
+    long long int jstep = nroao*kstep;
+    long long int istep = nroao*jstep;
+
+
+}
+
+
 void MOtrans_mod(systeminfo *sysinfo,OEints* onemats,TEints *twomats,pHF* postHF){
     double* MOs              = onemats->MOs;
     int nroao                = sysinfo->nroao;

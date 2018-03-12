@@ -8,6 +8,103 @@ double get_integral(double* ints,long long int &istep,long long int &jstep,long 
            ints[(i/2)*istep + (l/2)*jstep + (j/2)*kstep + k/2]*(i%2==l%2)*(j%2==k%2);
 }
 
+void form_fock_ri(cc_helper* CC,pHF* postHF,systeminfo* sysinfo)
+{
+    int norb   = CC->norb;
+    int nroao  = CC->nroao;
+    int nocc   = CC->nocc;
+    int nvir   = CC->nvir;
+
+    CC->f_ri      = new double[norb*norb];
+    CC->h         = new double[norb*norb];
+
+    double* f  = CC->f_ri;
+    double* h  = CC->h;
+    double* Hmat = CC->Hmat;
+    double* MOs = CC->MOs;
+
+    memset(h,0,norb*norb*sizeof(double));
+    memset(f,0,norb*norb*sizeof(double));
+
+    double twoe = 0.0;
+    long long int kstep = nroao;
+    long long int jstep = nroao*kstep;
+    long long int istep = nroao*jstep;
+
+    for(int i=0; i<norb; i++)
+        for(int j=0; j<norb; j++)
+            for(int mu=0; mu<nroao; mu++)
+                for(int nu=0; nu<nroao; nu++) {
+                    h[i*norb+j] += MOs[(i/2)*nroao +mu]*Hmat[mu*nroao + nu]*MOs[(j/2)*nroao +nu]*(j%2==i%2);
+                }
+
+
+
+    for(int i=0;i<nocc;i+=2){
+        for(int a=0; a<nocc; a+=2){
+            twoe=0.0;
+            for(int j=0; j<nocc; j+=2)
+                twoe += (2*cblas_ddot(sysinfo->naux_2,&(postHF->Bij[i/2*nocc/2+a/2]),nocc*nocc/4,&(postHF->Bij[j/2*nocc/2+j/2]),nocc*nocc/4)
+                         -cblas_ddot(sysinfo->naux_2,&(postHF->Bij[i/2*nocc/2+j/2]),nocc*nocc/4,&(postHF->Bij[j/2*nocc/2+a/2]),nocc*nocc/4));
+            f[i*norb+a] = h[i*norb+a] + twoe;
+            f[(i+1)*norb+a+1] = h[i*norb+a] + twoe;
+        }
+
+    }
+/*
+    for(int i=0;i<nocc/2;i+=2){
+        for(int a=0; a<nvir/2; a+=2){
+            twoe=0.0;
+            for(int j=0; j<nocc/2; j++)
+                twoe += (2*cblas_ddot(sysinfo->naux_2,&(postHF->Bia[i*nvir+a]),nocc*nvir,&(postHF->Bij[j*nocc+j]),nocc*nocc)
+                          -cblas_ddot(sysinfo->naux_2,&(postHF->Bij[i*nocc+j]),nocc*nocc,&(postHF->Bia[j*nvir+a]),nocc*nvir));
+            f[i*norb+a+nocc] = h[i*norb+a+nocc] + twoe;
+            f[(i+1)*norb+nocc+1] = h[(i+1)*norb+a+nocc+1] + twoe;
+        }
+
+    }
+
+    for(int i=0;i<nvir/2;i+=2){
+        for(int a=0; a<nocc/2; a+=2){
+            twoe=0.0;
+            for(int j=0; j<nocc/2; j++)
+                twoe += (2*cblas_ddot(sysinfo->naux_2,&(postHF->Bia[a*nocc+i]),nocc*nvir,&(postHF->Bij[j*nocc+j]),nocc*nocc)
+                          -cblas_ddot(sysinfo->naux_2,&(postHF->Bia[j*nvir+i]),nocc*nvir,&(postHF->Bij[j*nocc+a]),nocc*nocc));
+            f[i*norb+a] = h[i*norb+a] + twoe;
+            f[(i+1)*norb+a+1] = h[(i+1)*norb+a+1] + twoe;
+        }
+
+    }
+*/
+    for(int i=0;i<nvir;i+=2){
+        for(int a=0; a<nvir; a+=2){
+            twoe=0.0;
+            for(int j=0; j<nocc; j+=2)
+                twoe += (2*cblas_ddot(sysinfo->naux_2,&(postHF->Bab[a/2*nvir/2+i/2]),nvir*nvir/4,&(postHF->Bij[j/2*nocc/2+j/2]),nocc*nocc/4)
+                          -cblas_ddot(sysinfo->naux_2,&(postHF->Bia[j/2*nvir/2+i/2]),nocc*nvir/4,&(postHF->Bia[j/2*nvir/2+a/2]),nocc*nvir/4));
+            f[(i+nocc)*norb+nocc+a] = h[(i+nocc)*norb+nocc+a] + twoe;
+            f[(i+nocc+1)*norb+a+nocc+1] = h[(i+nocc)*norb+a+nocc] + twoe;
+        }
+
+    }
+
+
+
+/*
+    for(int i=0; i<norb; i++)
+        for(int a=0; a<norb; a++)
+        {
+            twoe=0.0;
+            for(int j=0; j<nocc; j++)
+                twoe +=    get_integral(postHF->prec_ints,istep,jstep,kstep, i, j , a , j ) ;
+            f[i*norb+a] = h[i*norb+a] + twoe;
+        }
+*/
+
+}
+
+
+
 void form_fock(cc_helper* CC,pHF* postHF)
 {
     int norb   = CC->norb;
@@ -567,6 +664,18 @@ void ccsd_ur(systeminfo* sysinfo,OEints* onemats,pHF* postHF){
     calc_ints_so(CC,postHF);
     allocate_amplitudes_intermediates(CC,CC_int);
     form_fock(CC,postHF);
+    form_fock_ri(CC,postHF,sysinfo);
+
+
+    double dev = 0.0;
+
+    for (int i=0;i<sysinfo->nroao;i++){
+        std::cout<<CC->f[i*CC->norb +i] << "   "<<CC->f_ri[i*CC->norb + i]<<std::endl;
+
+    }
+
+
+    /*
     calc_e_check(CC,postHF);
     ccsd_guess(CC,postHF);
 
@@ -595,403 +704,8 @@ void ccsd_ur(systeminfo* sysinfo,OEints* onemats,pHF* postHF){
     else{
         std::cout<<"GD JOB";
     }
-
-
-
-
-
-
-
-    //Intermediates:
-
-
-    /*
-    memset(Fae,0,nvir*nvir*sizeof(double));
-    memset(Fmi,0,nocc*nocc*sizeof(double));
-    memset(Fme,0,nocc*nvir*sizeof(double));
-
-
-    double Eold = 0.0;
-    double Ecc = 0.0;
-    double dE   = 0.0;
-
-    double sum = 0.0;
-    int tmpc = 0;
-    int tmpd = 0;
-    int tmpa = 0;
-    int tmpb = 0;
-    int tmpe = 0;
-    int tmpf = 0;
-
-    int m_step,n_step,a_step,b_step,e_step,i_step;
-
-
-
-    //f^{k}_{c} t^{c}_{k}
-
-    //Tau intermediates
-
-    //Fae
-
-    //Fmi
-
-
-    //Fme
-    for(int m=0;m<nocc;m++)
-        for(int e=0;e<nvir;e++){
-            Fme[m*nvir + e] = f[m*norb + (nocc+e)];
-            for(int n=0;n<nocc;n++)
-                for(int f=0;f<nvir;f++){
-                    tmpe = e+nocc;
-                    tmpf = f+nocc;
-                    Fme[m*nvir+e] += T1[n*nvir+f] *get_integral(prec_ints,istep,jstep,kstep, m , n , tmpe , tmpf);
-                }
-        }
-
-
-    //Wmnij
-    m_step = nocc*nocc*nocc;
-    n_step = nocc*nocc;
-    i_step = nocc;
-
-    for(int m=0;m<nocc;m++)
-        for(int n=0;n<nocc;n++)
-            for(int i=0;i<nocc;i++)
-                for(int j=0;j<nocc;j++){
-                    Wmnij[m*m_step+n*n_step+i*i_step+j] = get_integral(prec_ints,istep,jstep,kstep, m , n , i , j);
-                    for(int e=0;e<nvir;e++){
-                        tmpe = e+nocc;
-                        Wmnij[m*m_step+n*n_step+i*i_step+j] += (T1[j*nvir + e]*get_integral(prec_ints,istep,jstep,kstep, m , n , i , tmpe)-
-                                                                T1[i*nvir + e]*get_integral(prec_ints,istep,jstep,kstep, m , n , j , tmpe));
-                    }
-                    for(int e=0;e<nvir;e++)
-                        for(int f=0;f<nvir;f++)
-                        {
-                            tmpe = e+nocc;
-                            tmpf = f+nocc;
-                            Wmnij[m*m_step+n*n_step+i*i_step+j] += 0.25*tau[i*Ti_step+j*Tj_step + e*Ta_step + f]*get_integral(prec_ints,istep,jstep,kstep, m , n , tmpe , tmpf);
-                        }
-
-                }
-
-    //Wabef
-
-    a_step = nvir*nvir*nvir;
-    b_step = nvir*nvir;
-    e_step = nvir;
-    for(int a=0;a<nvir;a++)
-        for(int b=0;b<nvir;b++)
-            for(int e=0;e<nvir;e++)
-                for(int f=0;f<nvir;f++)
-                {
-                    tmpa = a+nocc;
-                    tmpb = b+nocc;
-                    tmpe = e+nocc;
-                    tmpf = f+nocc;
-                    Wabef[a*a_step + b*b_step + e*e_step +f] = get_integral(prec_ints,istep,jstep,kstep, tmpa , tmpb , tmpe , tmpf);
-
-                    for (int m=0;m<nocc;m++){
-                        tmpa = a+nocc;
-                        tmpe = e+nocc;
-                        tmpf = f+nocc;
-                        Wabef[a*a_step + b*b_step + e*e_step +f] -= (T1[m*nvir+b]*get_integral(prec_ints,istep,jstep,kstep, tmpa , m , tmpe , tmpf) -
-                                                                     T1[m*nvir+a]*get_integral(prec_ints,istep,jstep,kstep, tmpb , m , tmpe , tmpf));
-                    }
-
-                    for(int m=0;m<nocc;m++)
-                        for(int n=0;n<nocc;n++)
-                        {
-                            tmpe = e+nocc;
-                            tmpf = f+nocc;
-                            Wabef[a*a_step + b*b_step + e*e_step +f] += 0.25*tau[m*Ti_step+n*Tj_step + a*Ta_step + b]*get_integral(prec_ints,istep,jstep,kstep, m , n , tmpe , tmpf);
-                        }
-
-                }
-
-
-    //Wmbej
-
-
-    m_step = nvir*nvir*nocc;
-    b_step = nvir*nocc;
-    e_step = nocc;
-
-    for (int m=0;m<nocc;m++)
-        for(int b=0;b<nvir;b++)
-            for(int e=0;e<nvir; e++)
-                for(int j=0;j<nocc;j++)
-                {
-                    tmpb = nocc + b;
-                    tmpe = nocc + e;
-                    Wmbej[m*m_step+b*b_step+e*e_step+j] = get_integral(prec_ints,istep,jstep,kstep, m , tmpb , tmpe , j);
-
-                    for(int f=0;f<nvir; f++){
-                        tmpb = b+nocc;
-                        tmpe = e+nocc;
-                        tmpf = f+nocc;
-                        Wmbej[m*m_step+b*b_step+e*e_step+j] += T1[j*nvir+f]*get_integral(prec_ints,istep,jstep,kstep, m , tmpb , tmpe , tmpf);
-                    }
-
-                    for(int n=0;n<nocc; n++){
-                        tmpe = e+nocc;
-                        Wmbej[m*m_step+b*b_step+e*e_step+j] -= T1[n*nvir+b]*get_integral(prec_ints,istep,jstep,kstep, m , n , tmpe , j);
-                    }
-                    for(int n=0;n<nocc; n++)
-                        for(int f=0;f<nvir; f++){
-                            tmpe = e+nocc;
-                            tmpf = f+nocc;
-                            Wmbej[m*m_step+b*b_step+e*e_step+j] -= (0.5*T2[j*Ti_step+n*Tj_step+f*Ta_step+b]+T1[j*nvir+f]*T1[n*nvir+b])*get_integral(prec_ints,istep,jstep,kstep, m , n , tmpe , tmpf);
-                        }
-
-                }
-
-    //T1n update
-
-    for(int i=0;i<nocc;i++)
-        for(int a=0;a<nvir;a++)
-        {
-            T1n[i*nvir+a] = f[i*norb + (nocc+a)];
-            for(int e = 0;e<nvir;e++)
-            {
-                T1n[i*nvir+a] +=  T1[i*nvir+e] * Fae[a*nvir + e];
-            }
-            for(int m = 0;m<nocc;m++){
-                T1n[i*nvir+a] -=  T1[m*nvir+a]*Fmi[m*nocc+i];
-            }
-            for(int m = 0;m<nocc;m++)
-                for(int e = 0;e<nvir;e++){
-                    T1n[i*nvir+a] += T2[i*Ti_step + m*Tj_step+a*Ta_step +e] *Fme[m*nvir+e];
-                }
-           for(int n = 0;n<nocc;n++)
-               for(int f = 0;f<nvir;f++){
-                   tmpa = a+nocc;
-                   tmpf = f+nocc;
-                   T1n[i*nvir+a] -=T1[n*nvir+f] * get_integral(prec_ints,istep,jstep,kstep, n , tmpa , i , tmpf);
-               }
-           for(int m = 0;m<nocc;m++)
-               for(int e = 0;e<nvir;e++)
-                   for(int f = 0;f<nvir;f++)
-                   {
-                       tmpa = a+nocc;
-                       tmpf = f+nocc;
-                       tmpe = e+nocc;
-                       T1n[i*nvir+a] -= 0.5*(T2[i*Ti_step+m*Tj_step+e*Ta_step+f] * get_integral(prec_ints,istep,jstep,kstep, m , tmpa , tmpe , tmpf));
-                   }
-            for(int m = 0;m<nocc;m++)
-                for(int e = 0;e<nvir;e++)
-                    for(int n = 0;n<nocc;n++){
-                        tmpe = e+nocc;
-                        T1n[i*nvir+a] -= 0.5*(T2[m*Ti_step+n*Tj_step+a*Ta_step+e]*get_integral(prec_ints,istep,jstep,kstep, n , m , tmpe , i));
-                    }
-
-        T1n[i*nvir+a] /=( f[i*norb+i] -f[(nocc+a)*norb +nocc+a]);
-        }
-
-
-    //T2 Update
-    double s0 = 0.0;
-    double s1 = 0.0;
-    for(int i=0;i<nocc;i++)
-        for(int j=0;j<nocc;j++)
-            for(int a=0;a<nvir;a++)
-                for(int b=0;b<nvir;b++){
-                    tmpa = a + nocc;
-                    tmpb = b + nocc;
-                    T2n[i*Ti_step+j*Tj_step+a*Ta_step+b] = get_integral(prec_ints,istep,jstep,kstep, i , j , tmpa , tmpb);
-                    for(int e=0;e<nvir;e++)
-                    {
-                        s0 = 0.0;
-                        s1 = 0.0;
-                        for(int m=0;m<nocc;m++){
-                            s0 += -0.5*(T1[m*nvir+b] * Fme[m*nvir+e]);
-                            s1 += -0.5*(T1[m*nvir+a] * Fme[m*nvir+e]);
-                        }
-                        s0 += Fae[b*nvir+e];
-                        s1 += Fae[a*nvir+e];
-                        T2n[i*Ti_step+j*Tj_step+a*Ta_step+b] += T2[i*Ti_step+j*Tj_step+a*Ta_step+e]*s0 - T2[i*Ti_step+j*Tj_step+b*Ta_step+e]*s1;
-                    }
-
-                    for(int m=0;m<nocc;m++)
-                    {
-                        s0 = 0.0;
-                        s1 = 0.0;
-                        for(int e=0;e<nvir;e++){
-                            s0 += 0.5*(T1[j*nvir+e]*Fme[m*nvir+e]);
-                            s1 += 0.5*(T1[i*nvir+e]*Fme[m*nvir+e]);
-                        }
-                        s0 += Fmi[m*nocc+j];
-                        s1 += Fmi[m*nocc+i];
-                        T2n[i*Ti_step+j*Tj_step+a*Ta_step+b] -= (T2[i*Ti_step+m*Tj_step+a*Ta_step+b]*s0 - T2[j*Ti_step+m*Tj_step+a*Ta_step+b]*s1);
-
-                    }
-                    m_step = nocc*nocc*nocc;
-                    n_step = nocc*nocc;
-                    i_step = nocc;
-                    for(int m=0;m<nocc;m++)
-                        for(int n=0;n<nocc;n++){
-                            T2n[i*Ti_step+j*Tj_step+a*Ta_step+b] += 0.5*tau[m*Ti_step+n*Tj_step+a*Ta_step+b]*Wmnij[m*m_step+n*n_step+i*i_step+j];
-                        }
-                    a_step = nvir*nvir*nvir;
-                    b_step = nvir*nvir;
-                    e_step = nvir;
-                    for(int e=0;e<nvir;e++)
-                        for(int f=0;f<nvir;f++){
-                            T2n[i*Ti_step+j*Tj_step+a*Ta_step+b] += 0.5*tau[i*Ti_step+j*Tj_step+e*Ta_step+f]*Wabef[a*a_step+b*b_step+e*e_step+f];
-                        }
-
-                    m_step = nvir*nvir*nocc;
-                    b_step = nvir*nocc;
-                    e_step = nocc;
-                    for(int m=0;m<nocc;m++)
-                        for(int e=0;e<nvir;e++){
-                            tmpb = b+nocc;
-                            tmpa = a+nocc;
-                            tmpe = e+nocc;
-                            T2n[i*Ti_step+j*Tj_step+a*Ta_step+b] +=((T2[i*Ti_step+m*Tj_step+a*Ta_step+e] * Wmbej[m*m_step+b*b_step+e*e_step+j]-T1[i*nvir+e]*T1[m*nvir+a]* get_integral(prec_ints,istep,jstep,kstep, m , tmpb , tmpe , j))-
-                                                                    (T2[i*Ti_step+m*Tj_step+b*Ta_step+e] * Wmbej[m*m_step+a*b_step+e*e_step+j]-T1[i*nvir+e]*T1[m*nvir+b]* get_integral(prec_ints,istep,jstep,kstep, m , tmpa , tmpe , j)))-
-                                                                   ((T2[j*Ti_step+m*Tj_step+a*Ta_step+e] * Wmbej[m*m_step+b*b_step+e*e_step+i]-T1[j*nvir+e]*T1[m*nvir+a]* get_integral(prec_ints,istep,jstep,kstep, m , tmpb , tmpe , i))-
-                                                                    (T2[j*Ti_step+m*Tj_step+b*Ta_step+e] * Wmbej[m*m_step+a*b_step+e*e_step+i]-T1[j*nvir+e]*T1[m*nvir+b]* get_integral(prec_ints,istep,jstep,kstep, m , tmpa , tmpe , i)));
-                     }
-                    for(int e=0;e<nvir;e++){
-                        tmpb = b+nocc;
-                        tmpa = a+nocc;
-                        tmpe = e+nocc;
-                        T2n[i*Ti_step+j*Tj_step+a*Ta_step+b] += (T1[i*nvir+e] * get_integral(prec_ints,istep,jstep,kstep, tmpa , tmpb , tmpe , j)-
-                                                                 T1[j*nvir+e] * get_integral(prec_ints,istep,jstep,kstep, tmpa , tmpb , tmpe , i));
-                    }
-                    for(int m=0;m<nocc;m++){
-                        tmpb = b+nocc;
-                        tmpa = a+nocc;
-                        T2n[i*Ti_step+j*Tj_step+a*Ta_step+b] -= (T1[m*nvir+a]*get_integral(prec_ints,istep,jstep,kstep, m , tmpb , i , j))-
-                                                                (T1[m*nvir+b]*get_integral(prec_ints,istep,jstep,kstep, m , tmpa , i , j) );
-                    }
-
-                T2n[i*Ti_step+j*Tj_step+a*Ta_step+b]/=(f[i*norb+i]+f[j*norb+j]-f[(nocc+a)*norb+(nocc+a)]-f[(nocc+b)*norb + nocc+b]);
-
-                }
-    /*
-    //debug section
-    for(int i=0;i<(nocc*nvir);i++)
-        std::cout<<i<<" "<<T1n[i]<<std::endl;
-
-
-    std::cout<<"ITER:"<<iter;
-    std::cout<<"Fae\n";
-    for(int i=0;i<nvir;i++)
-        for(int j=0;j<nvir;j++)
-        {
-            if (abs(Fae[i*nvir+j])>1E-6){
-                std::cout<<i<<" "<<j<<" : "<< Fae[i*nvir+j]<<std::endl;
-            }
-        }
-    std::cout<<"Fmi\n";
-    for(int m=0;m<nocc;m++)
-        for(int i=0;i<nocc;i++)
-        {
-            if (abs(Fmi[m*nocc+i])>1E-6){
-                std::cout<<m<<" "<<i<<" : "<< Fmi[m*nocc+i]<<std::endl;
-            }
-        }
-    std::cout<<"Fme\n";
-    for(int m=0;m<nocc;m++)
-        for(int e=0;e<nvir;e++)
-        {
-            if (abs(Fme[m*nvir+e])>1E-6){
-                std::cout<<m<<" "<<e<<" : "<< Fme[m*nvir+e]<<std::endl;
-            }
-        }
-
-    std::cout<<"Wmnij\n";
-    m_step = nocc*nocc*nocc;
-    n_step = nocc*nocc;
-    i_step = nocc;
-
-    for(int m=0;m<nocc;m++)
-        for(int n=0;n<nocc;n++)
-            for(int i=0;i<nocc;i++)
-                for(int j=0;j<nocc;j++){
-                    if (abs(Wmnij[m*m_step+n*n_step+i*i_step+j])>1E-6){
-                        std::cout<<m<<" "<<n<<" "<<i<<" "<<j<<" : "<< Wmnij[m*m_step+n*n_step+i*i_step+j]<<std::endl;
-                    }
-                }
-    std::cout<<"Wabef\n";
-    a_step = nvir*nvir*nvir;
-    b_step = nvir*nvir;
-    e_step = nvir;
-    for(int a=0;a<nvir;a++)
-        for(int b=0;b<nvir;b++)
-            for(int e=0;e<nvir;e++)
-                for(int f=0;f<nvir;f++){
-                    if (abs(Wabef[a*a_step+b*b_step+e*e_step+f])>1E-6){
-                        std::cout<<a<<" "<<b<<" "<<e<<" "<<f<<" : "<<Wabef[a*a_step+b*b_step+e*e_step+f]<<std::endl;
-                    }
-                }
-    int wcounter =0;
-    std::cout<<"Wmbej\n";
-    m_step = nvir*nvir*nocc;
-    b_step = nvir*nocc;
-    e_step = nocc;
-
-    for (int m=0;m<nocc;m++)
-        for(int b=0;b<nvir;b++)
-            for(int e=0;e<nvir; e++)
-                for(int j=0;j<nocc;j++){
-                    if (abs(Wmbej[m*m_step+b*b_step+e*e_step+j])>1E-6){
-                        std::cout<<m<<" "<<b<<" "<<e<<" "<<j<<" : "<<Wmbej[m*m_step+b*b_step+e*e_step+j]<<std::endl;
-                        wcounter++;
-                    }
-                }
-    std::cout<<wcounter;
-
-
-    std::cout<<"T1\n";
-    for (int i=0;i<nocc;i++)
-        for(int a=0;a<nvir;a++){
-            if (abs(T1n[i*nvir+a])>1E-12){
-                std::cout<<i<<" "<<a<<" : "<<T1n[i*nvir+a]<<std::endl;
-            }
-        }
-
-    std::cout<<"T2\n";
-    int t2counter=0;
-    for(int i=0;i<nocc;i++)
-        for(int j=0;j<nocc;j++)
-            for(int a=0;a<nvir;a++)
-                for(int b=0;b<nvir;b++){
-                    if (abs(T2n[i*Ti_step + j*Tj_step + a*Ta_step + b])>1E-6){
-                        std::cout<<i<<" "<<j<<" "<<a<<" "<<b<<" : "<<T2n[i*Ti_step + j*Tj_step + a*Ta_step + b]<<std::endl;
-                        t2counter++;
-                    }
-                }
-    std::cout<<t2counter<<"\n";
-
-
-    std::cout<<"tau\n";
-    for(int i=0;i<nocc;i++)
-        for(int j=0;j<nocc;j++)
-            for(int a=0;a<nvir;a++)
-                for(int b=0;b<nvir;b++){
-                    if (abs(tau[i*Ti_step + j*Tj_step + a*Ta_step + b])>1E-6){
-                        std::cout<<i<<" "<<j<<" "<<a<<" "<<b<<" : "<<tau[i*Ti_step + j*Tj_step + a*Ta_step + b]<<std::endl;
-                    }
-                }
-
-    std::cout<<"taus\n";
-    for(int i=0;i<nocc;i++)
-        for(int j=0;j<nocc;j++)
-            for(int a=0;a<nvir;a++)
-                for(int b=0;b<nvir;b++){
-                    if (abs(tau_s[i*Ti_step + j*Tj_step + a*Ta_step + b])>1E-6){
-                        std::cout<<i<<" "<<j<<" "<<a<<" "<<b<<" : "<<tau_s[i*Ti_step + j*Tj_step + a*Ta_step + b]<<std::endl;
-                    }
-                }
-
-
-
-    std::cout.flush();
-
-
-
-    }
-*/
+    */
 }
+
+
+

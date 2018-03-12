@@ -17,6 +17,7 @@ struct cc_helper{
     double* Hmat;
     double* MOs; //
     double* f;   //  fock matrix so basis
+    double* f_ri;
     double* h;
 
     double* pMem;    //

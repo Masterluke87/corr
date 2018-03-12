@@ -10,6 +10,8 @@ struct pHF{
     double* ints_so;
     double* BPQ;
     double* Bia;
+    double* Bij;
+    double* Bab;
 };
 
 

@@ -38,6 +38,7 @@ add_executable(mp2 main.cc
                     POSTHF/ccsd_intermediates.cc
                     POSTHF/ri.cc
                     POSTHF/ccsd.cc
+                    POSTHF/ccsd_ri.cc
                     IO/ops_io.cc
                     MATH/ops_mat.cc
                     SCF/ops_rhf.cc

@@ -158,7 +158,6 @@ int main(int argc, char const *argv[]) {
 
     {
         ritrafo_start = omp_get_wtime();
-        postHF->Bia = new double[(sysinfo->naux_2)*(sysinfo->nroe/2)*(sysinfo->nroao-sysinfo->nroe/2)];
         //read_transform_ri(prefix,nroe,nroao,naux_2,MOs,Bia);
         transform_ri(sysinfo,onemats,postHF);
         ritrafo_end = omp_get_wtime();
@@ -168,10 +167,58 @@ int main(int argc, char const *argv[]) {
      } //end RI-MP2
 
 
+    double inte;
+    int nocc = sysinfo->nroe/2;
+    int nroao = sysinfo->nroao;
+    int nvir  = sysinfo->nroao - nocc;
+/*
+    double maxdev = 0.0;
+    for (int i=0;i<nocc;i++){
+        for (int j=0;j<nocc;j++)
+            for (int k=0;k<nocc;k++)
+                for (int l=0;l<nocc;l++){
+                    inte  =cblas_ddot(sysinfo->naux_2,&(postHF->Bij[i*nocc+j]),nocc*nocc,&(postHF->Bij[k*nocc+l]),nocc*nocc);
+                    std::cout<<postHF->prec_ints[i*nroao*nroao*nroao + j*nroao*nroao + k*nroao +l]<<" "<<inte
+                             <<" "<<abs(postHF->prec_ints[i*nroao*nroao*nroao + j*nroao*nroao + k*nroao +l]-inte)<<std::endl;
+                    if (abs(postHF->prec_ints[i*nroao*nroao*nroao + j*nroao*nroao + k*nroao +l]-inte)>maxdev)
+                        maxdev = abs(postHF->prec_ints[i*nroao*nroao*nroao + j*nroao*nroao + k*nroao +l]-inte);
+
+        }
+    }
+    for (int a=0;a<nvir;a++){
+        for (int b=0;b<nvir;b++)
+            for (int c=0;c<nvir;c++)
+                for (int d=0;d<nvir;d++){
+                    inte  =cblas_ddot(sysinfo->naux_2,&(postHF->Bab[a*nvir+b]),nvir*nvir,&(postHF->Bab[c*nvir+d]),nvir*nvir);
+                    std::cout<<postHF->prec_ints[(a+nocc)*nroao*nroao*nroao + (b+nocc)*nroao*nroao + (c+nocc)*nroao + (nocc+d)]<<" "<<inte
+                             <<" "<<abs(postHF->prec_ints[(a+nocc)*nroao*nroao*nroao + (b+nocc)*nroao*nroao + (c+nocc)*nroao + (nocc+d)]-inte)<<std::endl;
+                    if (abs(postHF->prec_ints[(a+nocc)*nroao*nroao*nroao + (b+nocc)*nroao*nroao + (c+nocc)*nroao + (nocc+d)]-inte)>maxdev)
+                        maxdev = abs(postHF->prec_ints[(a+nocc)*nroao*nroao*nroao + (b+nocc)*nroao*nroao + (c+nocc)*nroao + (nocc+d)]-inte);
+
+        }
+    }
+
+    for (int i=0;i<nocc;i++){
+        for (int a=0;a<nvir;a++)
+            for (int j=0;j<nocc;j++)
+                for (int b=0;b<nvir;b++){
+                    inte  =cblas_ddot(sysinfo->naux_2,&(postHF->Bia[i*nvir+a]),nvir*nocc,&(postHF->Bia[j*nvir+b]),nvir*nocc);
+                    std::cout<<postHF->prec_ints[(i)*nroao*nroao*nroao + (a+nocc)*nroao*nroao + (j)*nroao + (nocc+b)]<<" "<<inte
+                             <<" "<<abs(postHF->prec_ints[(i)*nroao*nroao*nroao + (a+nocc)*nroao*nroao + (j)*nroao + (nocc+b)]-inte)<<std::endl;
+                    if (abs(postHF->prec_ints[(i)*nroao*nroao*nroao + (a+nocc)*nroao*nroao + (j)*nroao + (nocc+b)]-inte)>maxdev)
+                        maxdev = abs(postHF->prec_ints[(i)*nroao*nroao*nroao + (a+nocc)*nroao*nroao + (j)*nroao + (nocc+b)]-inte);
+
+        }
+    }
+
+    std::cout<<"MaxDev:"<<maxdev<<std::endl;
+*/
 
 
 
     ccsd_ur(sysinfo,onemats,postHF);
+
+//    ccsd_ur_ri(sysinfo,onemats,postHF);
 
 
     /* What the fuck!! do we need ?

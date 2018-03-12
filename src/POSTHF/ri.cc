@@ -150,23 +150,60 @@ void transform_ri(systeminfo* sysinfo, OEints* onemats,pHF* postHF)
     int nroao = sysinfo->nroao;           //nr of bsf in aobasis
     int naux_2 = sysinfo->naux_2;          //nr of aux basis functions
     double* MOs = onemats->MOs;         //orbitals for transformation
+
+
+    postHF->Bia = new double[(sysinfo->naux_2)*(sysinfo->nroe/2)*(sysinfo->nroao-sysinfo->nroe/2)];
+    postHF->Bij = new double[(sysinfo->naux_2)*(sysinfo->nroe/2)*(sysinfo->nroe/2)];
+    postHF->Bab = new double[(sysinfo->naux_2)*(sysinfo->nroao-sysinfo->nroe/2)*(sysinfo->nroao-sysinfo->nroe/2)];
+
+
     double* BPQ = postHF->BPQ;          //input - calculated b^Q_pq
     double* Bia = postHF->Bia;         //output - transformed array containing mointegrals)
+    double* Bij = postHF->Bij;         //output - transformed array containing mointegrals)
+    double* Bab = postHF->Bab;         //output - transformed array containing mointegrals)
 
     int nocc = nroe/2;
     int nvir = nroao-nroe/2;
     double* BiQ = new double[naux_2*nocc*nroao];
+    double* BaQ = new double[naux_2*nvir*nroao];
+
     memset(BiQ,0,sizeof(double)*naux_2*nocc*nroao);
+    memset(BaQ,0,sizeof(double)*naux_2*nvir*nroao);
+
+    memset(Bij,0,sizeof(double)*naux_2*nocc*nocc);
     memset(Bia,0,sizeof(double)*naux_2*nocc*nvir);
+    memset(Bab,0,sizeof(double)*naux_2*nvir*nvir);
+
     for (int Q=0; Q<naux_2; Q++)
         for (int i=0; i<nocc; i++)
             for (int mu=0; mu<nroao; mu++)
                 for (int nu=0; nu<nroao; nu++)
                     BiQ[Q*nocc*nroao + i*nroao + nu] +=  MOs[i*nroao+mu]*BPQ[Q*nroao*nroao + mu*nroao + nu];
+
+    for (int Q=0; Q<naux_2; Q++)
+        for (int a=0; a<nvir; a++)
+            for (int mu=0; mu<nroao; mu++)
+                for (int nu=0; nu<nroao; nu++)
+                    BaQ[Q*nvir*nroao + a*nroao + nu] +=  MOs[(a+nocc)*nroao+mu]*BPQ[Q*nroao*nroao + mu*nroao + nu];
+
+    for (int Q=0; Q<naux_2; Q++)
+        for (int j=0; j<nocc; j++)
+            for (int i =0; i<nocc; i++)
+                for (int nu=0; nu<nroao; nu++)
+                    Bij[Q*nocc*nocc+i*nocc+j]+= MOs[j*nroao + nu]*BiQ[Q*nocc*nroao + i*nroao + nu ];
+
     for (int Q=0; Q<naux_2; Q++)
         for (int a=0; a<nvir; a++)
             for (int i =0; i<nocc; i++)
                 for (int nu=0; nu<nroao; nu++)
                     Bia[Q*nocc*nvir+i*nvir+a]+= MOs[(a+nroe/2)*nroao + nu]*BiQ[Q*nocc*nroao + i*nroao + nu ];
+
+    for (int Q=0; Q<naux_2; Q++)
+        for (int a=0; a<nvir; a++)
+            for (int b =0; b<nvir; b++)
+                for (int nu=0; nu<nroao; nu++)
+                    Bab[Q*nvir*nvir+a*nvir+b]+= MOs[(b+nroe/2)*nroao + nu]*BaQ[Q*nvir*nroao + a*nroao + nu ];
+
     delete[] BiQ;
+    delete[] BaQ;
 }
