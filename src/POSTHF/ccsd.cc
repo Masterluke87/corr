@@ -1046,10 +1046,35 @@ void ccsd_restr(systeminfo* sysinfo,OEints* onemats,pHF* postHF){
 
         }
 
+    double sum = 0.0;
     for(int a=0;a<nvir;a++)
-        for(int a=0;a<nvir;a++)
-            H[a*nvir+c] = 0.0;
+        for(int c=0;c<nvir;c++){
+            Hca[c*nvir+a] = 0.0;
+            sum = 0.0;
 
+                for(int k=0;k<nocc;k++)
+                    for(int l=0;l<nocc;l++)
+                         for(int d=0;d<nvir;d++){
+                             tmpc = c+nocc;
+                             tmpd = d+nocc;
+                             sum += (2*postHF->prec_ints[k*istep+tmpc*jstep+l*kstep+tmpd] - postHF->prec_ints[k*istep+tmpd*jstep+l*kstep+tmpc])*tau[k*Ti_step + l*Tj_step +  a*Ta_step +  d];
+
+                         }
+
+            Hca[c*nvir+a] =-sum;
+        }
+
+    for(int c=0;c<nvir;c++)
+        for(int k=0;k<nocc;k++){
+            Hck[c*nocc+k] = 0.0;
+                for(int l=0;l<nocc;l++)
+                    for(int d=0;d<nvir;d++){
+                        tmpc = c+nocc;
+                        tmpd = d+nocc;
+                        Hck[c*nocc+k]+=   (2*postHF->prec_ints[k*istep+tmpc*jstep+l*kstep+tmpd] - postHF->prec_ints[k*istep+tmpd*jstep+l*kstep+tmpc])*CC->T1[l*nvir+d];
+
+                    }
+        }
 
 
 }
