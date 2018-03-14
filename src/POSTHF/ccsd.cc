@@ -1076,6 +1076,67 @@ void ccsd_restr(systeminfo* sysinfo,OEints* onemats,pHF* postHF){
                     }
         }
 
+    double* Gik = new double[nocc*nocc];
+    double* Gca = new double[nvir*nvir];
+
+    for (int i=0;i<nocc;i++)
+        for(int k=0;k<nocc;k++){
+            Gik[i*nocc + k] = Hik[i*nocc+k];
+            for(int c=0;c<nvir;c++)
+                for(int l=0;l<nocc;l++){
+                    tmpc = nocc+c;
+                    Gik[i*nocc + k] += (2*postHF->prec_ints[i*istep+k*jstep+tmpc*kstep+l]
+                                        - postHF->prec_ints[i*istep+l*jstep+tmpc*kstep+k])*CC->T1[l*nvir+c];
+                }
+        }
+
+
+    int tmpa,tmpb;
+    for (int a=0;a<nvir;a++)
+        for(int c=0;c<nvir;c++){
+            Gca[c*nvir+a] = Hca[c*nvir+a];
+                for(int d=0;d<nvir;d++)
+                    for(int k=0;k<nocc;k++){
+                        tmpa = a+nocc;
+                        tmpc = c+nocc;
+                        tmpd = d+nocc;
+                        Gca[c*nvir+a] += (2*postHF->prec_ints[tmpa*istep+tmpc*jstep+tmpd*kstep+k]
+                                          - postHF->prec_ints[tmpa*istep+tmpd*jstep+tmpc*kstep+k])*CC->T1[k*nvir+d];
+                    }
+        }
+
+    double* Aijkl = new double[nocc*nocc*nocc*nocc];
+    double* Bcdab = new double[nvir*nvir*nvir*nvir];
+    double* Jicak = new double[nocc*nvir*nvir*nocc];
+    double* Kicka = new double[nocc*nvir*nocc*nvir];
+
+    int A_kstep = nocc;
+    int A_jstep = A_kstep*nocc;
+    int A_istep = A_istep*nocc;
+    for(int i=0;i<nocc;i++)
+        for(int j=0;j<nocc;j++)
+            for(int k=0;k<nocc;k++)
+                for(int l=0;l<nocc;l++){
+                    Aijkl[i*A_istep + j*A_jstep * k*A_kstep + l] = postHF->prec_ints[i*istep+k*jstep+j*kstep+l];
+                    for(int c=0;c<nvir;c++){
+                        tmpc = c+nocc;
+                        Aijkl[i*A_istep + j*A_jstep * k*A_kstep + l] += postHF->prec_ints[i*istep+k*jstep+tmpc*kstep+l]*CC->T1[j*nvir+c];
+                    }
+                    for(int c=0;c<nvir;c++){
+                        tmpc = c + nocc;
+                        Aijkl[i*A_istep + j*A_jstep * k*A_kstep + l] += postHF->prec_ints[tmpc*istep+k*jstep+j*kstep+l]*CC->T1[i*nvir+c];
+                    }
+                    for(int c=0;c<nvir;c++)
+                        for(int d=0;d<nvir;d++){
+                            tmpc = c + nocc;
+                            tmpd = d + nocc;
+                            Aijkl[i*A_istep + j*A_jstep * k*A_kstep + l] += postHF->prec_ints[k*istep+tmpc*jstep+l*kstep+tmpd]*tau[i*Ti_step+j*Tj_step + c*Ta_step +d];
+
+                    }
+                }
+
+
+
 
 }
 
