@@ -103,6 +103,42 @@ void form_fock_ri(cc_helper* CC,pHF* postHF,systeminfo* sysinfo)
 
 }
 
+void form_fock_restr(cc_helper* CC,pHF* postHF){
+    int nroao   = CC->nroao;
+    int nocc   = CC->nocc;
+
+    CC->f      = new double[nroao*nroao];
+    CC->h      = new double[nroao*nroao];
+
+    double* f  = CC->f;
+    double* h  = CC->h;
+    double* Hmat = CC->Hmat;
+    double* MOs = CC->MOs;
+
+    memset(h,0,nroao*nroao*sizeof(double));
+    memset(f,0,nroao*nroao*sizeof(double));
+
+    double twoe = 0.0;
+    long long int kstep = nroao;
+    long long int jstep = nroao*kstep;
+    long long int istep = nroao*jstep;
+
+    for(int i=0; i<nroao; i++)
+        for(int j=0; j<nroao; j++)
+            for(int mu=0; mu<nroao; mu++)
+                for(int nu=0; nu<nroao; nu++) {
+                    h[i*nroao+j] += MOs[(i)*nroao +mu]*Hmat[mu*nroao + nu]*MOs[j*nroao +nu];
+                }
+
+    for(int i=0; i<nroao; i++)
+        for(int a=0; a<nroao; a++)
+        {
+            twoe=0.0;
+            for(int j=0; j<nocc; j++)
+                twoe += 2*postHF->prec_ints[i*istep + a*jstep + j*kstep +j] - postHF->prec_ints[i*istep + j*jstep + j*kstep +a];
+            f[i*nroao+a] = h[i*nroao+a] + twoe;
+        }
+}
 
 
 void form_fock(cc_helper* CC,pHF* postHF)
@@ -144,6 +180,75 @@ void form_fock(cc_helper* CC,pHF* postHF)
         }
 }
 
+
+void calc_e_check_ri(cc_helper* CC,pHF* postHF){
+    double Eel = 0.0;
+    double twoe = 0.0;
+    double ion_rep = CC->ion_rep;
+    int nroao = CC->nroao;
+    int norb  = CC->norb;
+    int nocc  = CC->nocc;
+
+    double* h = CC->h;
+    double* f = CC->f_ri;
+
+    long long int kstep = nroao;
+    long long int jstep = nroao*kstep;
+    long long int istep = nroao*jstep;
+
+    for(int i=0; i<nocc; i++) {
+        for(int j=0; j<nocc; j++)
+            twoe += postHF->prec_ints[(i/2)*istep + (i/2)*jstep + (j/2)*kstep + (j/2)] - postHF->prec_ints[(i/2)*istep + (j/2)*jstep + (i/2)*kstep + (j/2)]*(i%2==j%2);
+        Eel += h[i*norb+i];
+    }
+    Eel+=0.5*twoe;
+    double onee = 0.0;
+    double fsum = 0.0;
+    for(int i=0; i<nocc; i++) {
+        onee += h[i*norb+i];
+        fsum += f[i*norb+i];
+    }
+    std::cout<<"El:"<<Eel+ion_rep<<std::endl;
+    std::cout<<"one:"<<onee+ion_rep<<std::endl;
+    std::cout<<"fsum-0.5twoe:"<<fsum-(0.5*twoe)+ion_rep;
+}
+
+
+void calc_e_check_restr(cc_helper* CC,pHF* postHF){
+    double Eel = 0.0;
+    double twoe = 0.0;
+    double ion_rep = CC->ion_rep;
+    int nroao = CC->nroao;
+    int nocc  = CC->nocc;
+
+    double* prec_ints = postHF->prec_ints;
+    double* h = CC->h;
+    double* f = CC->f;
+
+    long long int kstep = nroao;
+    long long int jstep = nroao*kstep;
+    long long int istep = nroao*jstep;
+
+    for(int i=0; i<nocc; i++) {
+        for(int j=0; j<nocc; j++)
+            twoe += 2*prec_ints[(i)*istep + (i)*jstep + (j)*kstep + (j)] - prec_ints[(i)*istep + (j)*jstep + (i)*kstep + (j)];
+        Eel += 2*h[i*nroao+i];
+    }
+    Eel+=twoe;
+    double onee = 0.0;
+    double fsum = 0.0;
+    for(int i=0; i<nocc; i++) {
+        onee += 2*h[i*nroao+i];
+        fsum += 2*f[i*nroao+i];
+    }
+    std::cout<<"El:"<<Eel+ion_rep<<std::endl;
+    std::cout<<"one:"<<onee+ion_rep<<std::endl;
+    std::cout<<"twoe:"<<twoe<<std::endl;
+    std::cout<<"fsum:"<<fsum-twoe+ion_rep;
+}
+
+
+
 void calc_e_check(cc_helper* CC,pHF* postHF){
     double Eel = 0.0;
     double twoe = 0.0;
@@ -176,6 +281,68 @@ void calc_e_check(cc_helper* CC,pHF* postHF){
     std::cout<<"one:"<<onee+ion_rep<<std::endl;
     std::cout<<"fsum-0.5twoe:"<<fsum-(0.5*twoe)+ion_rep;
 }
+
+void ccsd_guess_restr(cc_helper *CC,pHF* postHF){
+
+    int nvir =  CC->nvir;
+    int nocc =  CC->nocc;
+    int nroao = CC->nroao;
+
+    double* prec_ints = postHF->prec_ints;
+    double* f = CC->f;
+
+    double* T1 = CC->T1;
+    double* T2 = CC->T2;
+
+
+
+    memset(T1 ,0,nocc*nvir*sizeof(double));
+    memset(T2 ,0,nocc*nocc*nvir*nvir*sizeof(double));
+
+    int Ti,Tj,Ta,Tb = 0;
+    int Ta_step = nvir;
+    int Tj_step = Ta_step * nvir;
+    int Ti_step = Tj_step * nocc;
+    int tmpA = 0;
+    int tmpB = 0;
+
+    long long int nkstep = nroao;
+    long long int njstep = nroao*nkstep;
+    long long int nistep = nroao*njstep;
+
+
+    for (Ti = 0; Ti < nocc; Ti++) {
+        for (Tj = 0; Tj < nocc; Tj++) {
+            for (Ta = 0; Ta < nvir; Ta++) {
+                for (Tb = 0; Tb < nvir; Tb++) {
+                    tmpA = Ta+nocc;
+                    tmpB = Tb+nocc;
+                    T2[Ti*Ti_step + Tj*Tj_step + Ta*Ta_step + Tb] = - (postHF->prec_ints[Ti*nistep + tmpA*njstep + Tj*nkstep + tmpB])/
+                                                                    (-f[(Ti)*nroao + Ti] - f[Tj*nroao + Tj] + f[(Ta+nocc)*nroao + (Ta+nocc)] + f[(Tb+nocc)*nroao + (Tb+nocc)]);
+
+                }
+            }
+        }
+    }
+
+
+
+
+    double EMP2 = 0.0;
+    for (Ti = 0; Ti < nocc; Ti++) {
+        for (Tj = 0; Tj < nocc; Tj++) {
+            for (Ta = 0; Ta < nvir; Ta++) {
+                for (Tb = 0; Tb < nvir; Tb++) {
+                    tmpA=Ta+nocc;
+                    tmpB=Tb+nocc;
+                    EMP2 += postHF->prec_ints[Ti*nistep + tmpA*njstep + Tj*nkstep + tmpB] * (2*T2[Ti*Ti_step + Tj*Tj_step + Ta*Ta_step + Tb] - T2[Ti*Ti_step + Tj*Tj_step + Tb*Ta_step + Ta]);
+                }
+            }
+        }
+    }
+    std::cout<<"\n\nEMP2: "<<EMP2;
+}
+
 
 
 void ccsd_guess(cc_helper *CC,pHF* postHF){
@@ -238,6 +405,66 @@ void ccsd_guess(cc_helper *CC,pHF* postHF){
         }
     }
     std::cout<<"\n\nEMP2: "<<0.25*EMP2;
+}
+
+
+void ccsd_energy_restr(cc_helper *CC, pHF* postHF){
+
+    int nocc = CC->nocc;
+    int nvir = CC->nvir;
+    int nroao = CC->nroao;
+
+    double *prec_ints = postHF->prec_ints;
+    double *f = CC->f;
+
+    double *T1 = CC->T1;
+    double *T2 = CC->T2;
+
+    CC->Ecc_old = CC->Ecc;
+    CC->Ecc = 0.0;
+
+
+    int Ta_step = nvir;
+    int Tj_step = Ta_step * nvir;
+    int Ti_step = Tj_step * nocc;
+
+    long long int kstep = nroao;
+    long long int jstep = nroao*kstep;
+    long long int istep = nroao*jstep;
+
+    double sum = 0.0;
+
+    int tmpa = 0;
+    int tmpb = 0;
+    for(int i=0; i<nocc; i++)
+      for(int a=0;a<nvir; a++)
+        {
+        tmpa=a+nocc;
+        sum+= f[ i * nroao + tmpa ]*T1[ i * nvir + a ];
+        }
+    sum*= 2.0;
+    CC->Ecc+=sum;
+
+    //\frac{t^{dc}_{kl} v^{kl}_{dc}}{4}
+    sum = 0.0;
+    for(int a=0;a < nvir; a++)
+      for(int b=0;b < nvir; b++)
+        for(int i=0;i < nocc; i++)
+          for(int j=0;j < nocc; j++)
+            {
+                tmpa=a+nocc;
+                tmpb=b+nocc;
+                sum+= postHF->prec_ints[i*istep +tmpa*jstep + j*kstep +tmpb ] *
+                      (2*(T2[i*Ti_step + j*Tj_step + a *Ta_step + b] + T1[i*nvir +a]*T1[j*nvir+b])
+                        -(T2[j*Ti_step + i*Tj_step + a *Ta_step + b] + T1[j*nvir +a]*T1[i*nvir+b]));
+            }
+
+    sum*= 1.0000000000000;
+    CC->Ecc+=sum;
+
+    CC->DE = CC->Ecc_old-CC->Ecc;
+    std::cout<<CC->iter <<"E(CCSD)= "<<CC->Ecc<<" dE:"<<CC->DE<<"  "<<"\n";
+
 }
 
 
@@ -574,6 +801,44 @@ void ccsd_update_T2(cc_helper* CC,cc_intermediates *CC_int,pHF* postHF){
     }
 }
 
+void allocate_amplitudes_intermediates_restr(cc_helper* CC,cc_intermediates* CC_int){
+    int nocc=CC->nocc;
+    int nvir=CC->nvir;
+
+    long int mem_a = 2* (nocc*nvir) +
+                     2*(nocc*nocc*nvir*nvir);
+
+    long int mem_int = (nvir*nvir) + (nocc*nocc) + (nocc*nvir) +
+                       (nocc*nocc*nocc*nocc)+
+                       (nvir*nvir*nvir*nvir)+
+                       (nocc*nvir*nvir*nocc)+
+                       (nocc*nocc*nvir*nvir)+
+                       (nocc*nocc*nvir*nvir);
+
+    std::cout<<"\n Allocating "<<mem_a/1024/1024 <<"MB("<<mem_a/1024/1024/1024<<"Gb) for amplitues\n";
+    std::cout<<"Allocating "<<mem_int/1024/1024<<"MB("<<mem_int/1024/1024/1024<<"Gb) for intermediates\n";
+    std::cout.flush();
+    CC->pMem = new double[(mem_a+mem_int)];
+    long int inc = 0;
+
+    CC->T1  = &(CC->pMem[inc]);inc+=nocc*nvir;
+    CC->T1n = &(CC->pMem[inc]);inc+=nocc*nvir;
+
+    CC->T2  = &(CC->pMem[inc]);inc+=nocc*nocc*nvir*nvir;
+    CC->T2n = &(CC->pMem[inc]);inc+=nocc*nocc*nvir*nvir;
+
+    CC_int->Fae = &(CC->pMem[inc]); inc+=nvir*nvir;
+    CC_int->Fmi = &(CC->pMem[inc]); inc+=nocc*nocc;
+    CC_int->Fme = &(CC->pMem[inc]); inc+=nocc*nvir;
+
+    CC_int->Wmnij = &(CC->pMem[inc]); inc+=nocc*nocc*nocc*nocc;
+    CC_int->Wabef = &(CC->pMem[inc]); inc+=nvir*nvir*nvir*nvir;
+    CC_int->Wmbej = &(CC->pMem[inc]); inc+=nocc*nvir*nvir*nocc;
+
+    CC_int->tau   = &(CC->pMem[inc]); inc+=nocc*nocc*nvir*nvir;
+    CC_int->tau_s = &(CC->pMem[inc]);
+
+}
 
 void allocate_amplitudes_intermediates(cc_helper* CC,cc_intermediates* CC_int){
     int nocc=CC->nocc;
@@ -658,12 +923,14 @@ void ccsd_ur(systeminfo* sysinfo,OEints* onemats,pHF* postHF){
     CC->iter    = 0;
     cc_intermediates * CC_int = new cc_intermediates;
 
-    std::cout << "\nCCSD:\n----" << '\n';
+    std::cout << "\nCCSD (Spin-Orbital Formulation ):\n-----------" << '\n';
 
 
     calc_ints_so(CC,postHF);
     allocate_amplitudes_intermediates(CC,CC_int);
+
     form_fock(CC,postHF);
+
     form_fock_ri(CC,postHF,sysinfo);
 
 
@@ -674,11 +941,9 @@ void ccsd_ur(systeminfo* sysinfo,OEints* onemats,pHF* postHF){
 
     }
 
-
-    /*
     calc_e_check(CC,postHF);
     ccsd_guess(CC,postHF);
-
+ /*
 
     for (CC->iter=0;CC->iter<20;CC->iter++)
     {
@@ -706,6 +971,92 @@ void ccsd_ur(systeminfo* sysinfo,OEints* onemats,pHF* postHF){
     }
     */
 }
+
+
+
+void ccsd_restr(systeminfo* sysinfo,OEints* onemats,pHF* postHF){
+    cc_helper *CC = new cc_helper;
+    CC->nocc  = sysinfo->nroe/2;
+    CC->nroao = sysinfo->nroao;
+    CC->nvir  = (sysinfo->nroao - CC->nocc);
+    CC->MOs   = onemats->MOs;
+    CC->Hmat  = onemats->Hmat;
+    CC->ion_rep = sysinfo->ion_rep;
+    CC->Ecc     = 0.0;
+    CC->Ecc_old = 0.0;
+    CC->DE      = 100000.0;
+    CC->iter    = 0;
+    cc_intermediates_restr * CC_int = new cc_intermediates_restr;
+
+    std::cout << "\nCCSD (RESTRICTED Formulation):\n------------------------------" << '\n';
+
+    form_fock_restr(CC,postHF);
+    for (int i=0;i<sysinfo->nroao;i++){
+        std::cout<<CC->f[i*CC->nroao+i] << "   "<<CC->f[i*CC->nroao + i]<<std::endl;
+
+    }
+    //allocate_amplitudes_intermediates_restr(CC,CC_int);
+    calc_e_check_restr(CC,postHF);
+    ccsd_guess_restr(CC,postHF);
+
+
+    ccsd_energy_restr(CC,postHF);
+
+    int nocc = CC->nocc;
+    int nvir = CC->nvir;
+    int nroao =CC->nroao;
+
+    CC_int->Hik    = new double [nocc*nocc];
+    CC_int->Hca    = new double [nvir*nvir];
+    CC_int->Hck    = new double [nocc*nvir];
+
+
+    double *Hik = CC_int->Hik;
+    double *Hca = CC_int->Hca;
+    double *Hck = CC_int->Hck;
+
+    double* tau = new double[nocc*nocc*nvir*nvir];
+
+    int Ta_step = nvir;
+    int Tj_step = Ta_step * nvir;
+    int Ti_step = Tj_step * nocc;
+
+    long long int kstep = nroao;
+    long long int jstep = nroao*kstep;
+    long long int istep = nroao*jstep;
+
+
+    for(int i=0;i<nocc;i++)
+        for(int j=0;j<nocc;j++)
+            for(int a=0;a<nvir;a++)
+                for(int b=0;b<nvir;b++)
+                    tau[i*Ti_step+j*Tj_step+a*Ta_step+b] = CC->T2[i*Ti_step+j*Tj_step+a*Ta_step+b] + CC->T1[i*nvir+a]* CC->T1[j*nvir+b];
+
+    int tmpc,tmpd;
+    for(int i=0;i<nocc;i++)
+        for(int k=0;k<nocc;k++){
+            Hik[i*nocc+k] = 0.0;
+            for(int l=0;l<nocc;l++)
+                for(int c=0;c<nvir;c++)
+                    for(int d=0;d<nvir;d++){
+                        tmpc = c+nocc;
+                        tmpd = d+nocc;
+                        Hik[i*nocc+k] += (2*postHF->prec_ints[k*istep+tmpc*jstep+l*kstep+tmpd] - postHF->prec_ints[k*istep+tmpd*jstep+l*kstep+tmpc])*tau[i*Ti_step + l*Tj_step +  c*Ta_step +  d];
+                    }
+
+        }
+
+    for(int a=0;a<nvir;a++)
+        for(int a=0;a<nvir;a++)
+            H[a*nvir+c] = 0.0;
+
+
+
+}
+
+
+
+
 
 
 

@@ -19,6 +19,14 @@ struct cc_intermediates
     double* pMem;
 };
 
+
+struct cc_intermediates_restr
+{
+    double* Hik;
+    double* Hca;
+    double* Hck;
+};
+
 void allocate_intermediates_memory(cc_helper *CC,cc_intermediates* CC_int);
 void build_Fae(cc_helper* CC,cc_intermediates* CC_int,pHF* postHF);
 void build_Fmi(cc_helper* CC,cc_intermediates* CC_int,pHF* postHF);
