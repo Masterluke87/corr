@@ -216,8 +216,8 @@ int main(int argc, char const *argv[]) {
 
 
 
-    ccsd_ur(sysinfo,onemats,postHF);
-    ccsd_restr(sysinfo,onemats,postHF);
+  //  ccsd_ur(sysinfo,onemats,postHF);
+      ccsd_restr(sysinfo,onemats,postHF);
 
 //    ccsd_ur_ri(sysinfo,onemats,postHF);
 

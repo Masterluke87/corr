@@ -453,9 +453,8 @@ void ccsd_energy_restr(cc_helper *CC, pHF* postHF){
             {
                 tmpa=a+nocc;
                 tmpb=b+nocc;
-                sum+= postHF->prec_ints[i*istep +tmpa*jstep + j*kstep +tmpb ] *
-                      (2*(T2[i*Ti_step + j*Tj_step + a *Ta_step + b] + T1[i*nvir +a]*T1[j*nvir+b])
-                        -(T2[j*Ti_step + i*Tj_step + a *Ta_step + b] + T1[j*nvir +a]*T1[i*nvir+b]));
+                sum+= (2*postHF->prec_ints[i*istep +tmpa*jstep + j*kstep +tmpb ] - postHF->prec_ints[i*istep +tmpb*jstep + j*kstep +tmpa])
+                        * (CC->T2[i*Ti_step + j*Tj_step +  a*Ta_step + b] + CC->T1[i*nvir+a]*CC->T1[j*nvir+b]);
             }
 
     sum*= 1.0000000000000;
@@ -826,16 +825,16 @@ void allocate_amplitudes_intermediates_restr(cc_helper* CC,cc_intermediates* CC_
     CC->T2  = &(CC->pMem[inc]);inc+=nocc*nocc*nvir*nvir;
     CC->T2n = &(CC->pMem[inc]);inc+=nocc*nocc*nvir*nvir;
 
-    CC_int->Fae = &(CC->pMem[inc]); inc+=nvir*nvir;
-    CC_int->Fmi = &(CC->pMem[inc]); inc+=nocc*nocc;
-    CC_int->Fme = &(CC->pMem[inc]); inc+=nocc*nvir;
+   // CC_int->Fae = &(CC->pMem[inc]); inc+=nvir*nvir;
+   // CC_int->Fmi = &(CC->pMem[inc]); inc+=nocc*nocc;
+   // CC_int->Fme = &(CC->pMem[inc]); inc+=nocc*nvir;
 
-    CC_int->Wmnij = &(CC->pMem[inc]); inc+=nocc*nocc*nocc*nocc;
-    CC_int->Wabef = &(CC->pMem[inc]); inc+=nvir*nvir*nvir*nvir;
-    CC_int->Wmbej = &(CC->pMem[inc]); inc+=nocc*nvir*nvir*nocc;
+  //  CC_int->Wmnij = &(CC->pMem[inc]); inc+=nocc*nocc*nocc*nocc;
+  //  CC_int->Wabef = &(CC->pMem[inc]); inc+=nvir*nvir*nvir*nvir;
+  //  CC_int->Wmbej = &(CC->pMem[inc]); inc+=nocc*nvir*nvir*nocc;
 
-    CC_int->tau   = &(CC->pMem[inc]); inc+=nocc*nocc*nvir*nvir;
-    CC_int->tau_s = &(CC->pMem[inc]);
+  //  CC_int->tau   = &(CC->pMem[inc]); inc+=nocc*nocc*nvir*nvir;
+  //  CC_int->tau_s = &(CC->pMem[inc]);
 
 }
 
@@ -930,19 +929,11 @@ void ccsd_ur(systeminfo* sysinfo,OEints* onemats,pHF* postHF){
 
     form_fock(CC,postHF);
 
-    form_fock_ri(CC,postHF,sysinfo);
-
-
-    double dev = 0.0;
-
-    for (int i=0;i<sysinfo->nroao;i++){
-        std::cout<<CC->f[i*CC->norb +i] << "   "<<CC->f_ri[i*CC->norb + i]<<std::endl;
-
-    }
+   // form_fock_ri(CC,postHF,sysinfo);
 
     calc_e_check(CC,postHF);
     ccsd_guess(CC,postHF);
- /*
+
 
     for (CC->iter=0;CC->iter<20;CC->iter++)
     {
@@ -968,7 +959,7 @@ void ccsd_ur(systeminfo* sysinfo,OEints* onemats,pHF* postHF){
     else{
         std::cout<<"GD JOB";
     }
-    */
+
 }
 
 
@@ -989,6 +980,13 @@ void ccsd_restr(systeminfo* sysinfo,OEints* onemats,pHF* postHF){
 
     std::cout << "\nCCSD (RESTRICTED Formulation):\n------------------------------" << '\n';
 
+    int nocc = CC->nocc;
+    int nvir = CC->nvir;
+    int nroao =CC->nroao;
+
+    CC->T1 = new double[nocc*nvir];
+    CC->T2 = new double[nocc*nocc*nvir*nvir];
+
     form_fock_restr(CC,postHF);
     for (int i=0;i<sysinfo->nroao;i++){
         std::cout<<CC->f[i*CC->nroao+i] << "   "<<CC->f[i*CC->nroao + i]<<std::endl;
@@ -999,11 +997,9 @@ void ccsd_restr(systeminfo* sysinfo,OEints* onemats,pHF* postHF){
     ccsd_guess_restr(CC,postHF);
 
 
-    ccsd_energy_restr(CC,postHF);
 
-    int nocc = CC->nocc;
-    int nvir = CC->nvir;
-    int nroao =CC->nroao;
+
+
 
     CC_int->Hik    = new double [nocc*nocc];
     CC_int->Hca    = new double [nvir*nvir];
@@ -1015,6 +1011,16 @@ void ccsd_restr(systeminfo* sysinfo,OEints* onemats,pHF* postHF){
     double *Hck = CC_int->Hck;
 
     double* tau = new double[nocc*nocc*nvir*nvir];
+    double* Gik = new double[nocc*nocc];
+    double* Gca = new double[nvir*nvir];
+
+    double* Aijkl = new double[nocc*nocc*nocc*nocc];
+    double* Bcdab = new double[nvir*nvir*nvir*nvir];
+    double* Jicak = new double[nocc*nvir*nvir*nocc];
+    double* Kicka = new double[nocc*nvir*nocc*nvir];
+    double* r1    = new double[nocc*nvir];
+    double* r2    = new double[nocc*nocc*nvir*nvir];
+    double* Pijab = new double[nocc*nocc*nvir*nvir];
 
     int Ta_step = nvir;
     int Tj_step = Ta_step * nvir;
@@ -1024,6 +1030,12 @@ void ccsd_restr(systeminfo* sysinfo,OEints* onemats,pHF* postHF){
     long long int jstep = nroao*kstep;
     long long int istep = nroao*jstep;
 
+
+
+
+    for(int iter=0;iter<10;iter++){
+
+    ccsd_energy_restr(CC,postHF);
 
     for(int i=0;i<nocc;i++)
         for(int j=0;j<nocc;j++)
@@ -1075,8 +1087,7 @@ void ccsd_restr(systeminfo* sysinfo,OEints* onemats,pHF* postHF){
                     }
         }
 
-    double* Gik = new double[nocc*nocc];
-    double* Gca = new double[nvir*nvir];
+
 
     for (int i=0;i<nocc;i++)
         for(int k=0;k<nocc;k++){
@@ -1104,32 +1115,29 @@ void ccsd_restr(systeminfo* sysinfo,OEints* onemats,pHF* postHF){
                     }
         }
 
-    double* Aijkl = new double[nocc*nocc*nocc*nocc];
-    double* Bcdab = new double[nvir*nvir*nvir*nvir];
-    double* Jicak = new double[nocc*nvir*nvir*nocc];
-    double* Kicka = new double[nocc*nvir*nocc*nvir];
+
 
     int A_kstep = nocc;
     int A_jstep = A_kstep*nocc;
-    int A_istep = A_istep*nocc;
+    int A_istep = A_jstep*nocc;
     for(int i=0;i<nocc;i++)
         for(int j=0;j<nocc;j++)
             for(int k=0;k<nocc;k++)
                 for(int l=0;l<nocc;l++){
-                    Aijkl[i*A_istep + j*A_jstep * k*A_kstep + l] = postHF->prec_ints[i*istep+k*jstep+j*kstep+l];
+                    Aijkl[i*A_istep + j*A_jstep + k*A_kstep + l] = postHF->prec_ints[i*istep+k*jstep+j*kstep+l];
                     for(int c=0;c<nvir;c++){
                         tmpc = c+nocc;
-                        Aijkl[i*A_istep + j*A_jstep * k*A_kstep + l] += postHF->prec_ints[i*istep+k*jstep+tmpc*kstep+l]*CC->T1[j*nvir+c];
+                        Aijkl[i*A_istep + j*A_jstep + k*A_kstep + l] += postHF->prec_ints[i*istep+k*jstep+tmpc*kstep+l]*CC->T1[j*nvir+c];
                     }
                     for(int c=0;c<nvir;c++){
                         tmpc = c + nocc;
-                        Aijkl[i*A_istep + j*A_jstep * k*A_kstep + l] += postHF->prec_ints[tmpc*istep+k*jstep+j*kstep+l]*CC->T1[i*nvir+c];
+                        Aijkl[i*A_istep + j*A_jstep + k*A_kstep + l] += postHF->prec_ints[tmpc*istep+k*jstep+j*kstep+l]*CC->T1[i*nvir+c];
                     }
                     for(int c=0;c<nvir;c++)
                         for(int d=0;d<nvir;d++){
                             tmpc = c + nocc;
                             tmpd = d + nocc;
-                            Aijkl[i*A_istep + j*A_jstep * k*A_kstep + l] += postHF->prec_ints[k*istep+tmpc*jstep+l*kstep+tmpd]*tau[i*Ti_step+j*Tj_step + c*Ta_step +d];
+                            Aijkl[i*A_istep + j*A_jstep + k*A_kstep + l] += postHF->prec_ints[k*istep+tmpc*jstep+l*kstep+tmpd]*tau[i*Ti_step+j*Tj_step + c*Ta_step +d];
 
                     }
                 }
@@ -1168,7 +1176,7 @@ void ccsd_restr(systeminfo* sysinfo,OEints* onemats,pHF* postHF){
                     tmpa = a+nocc;
                     Jicak[i*J_istep + c*J_cstep + a*J_astep +k] = postHF->prec_ints[tmpa*istep + i*jstep + tmpc*kstep + k];
 
-                    for (int l=0;i<nocc;l++){
+                    for (int l=0;l<nocc;l++){
                         Jicak[i*J_istep + c*J_cstep + a*J_astep +k] -= postHF->prec_ints[i*istep + l*jstep + tmpc*kstep + k]*CC->T1[l*nvir+a];
                     }
 
@@ -1178,7 +1186,7 @@ void ccsd_restr(systeminfo* sysinfo,OEints* onemats,pHF* postHF){
                     }
 
                     for (int d=0;d<nvir;d++)
-                        for (int l=0;i<nocc;l++){
+                        for (int l=0;l<nocc;l++){
                             tmpd = d + nocc;
                             //-1/2(ckdl)(t2[ilda]+2*t[id]*t[la]
                             Jicak[i*J_istep + c*J_cstep + a*J_astep +k] -= 0.5*postHF->prec_ints[tmpc*istep + k*jstep + tmpd*kstep + l]*
@@ -1186,7 +1194,7 @@ void ccsd_restr(systeminfo* sysinfo,OEints* onemats,pHF* postHF){
                         }
 
                     for (int d=0;d<nvir;d++)
-                        for (int l=0;i<nocc;l++){
+                        for (int l=0;l<nocc;l++){
                             tmpd = d + nocc;
                             //1/2[2(ckdl)-(dkcl)]t2[ilad]
                             Jicak[i*J_istep + c*J_cstep + a*J_astep +k] += 0.5*(2*postHF->prec_ints[tmpc*istep + k*jstep + tmpd*kstep + l]-
@@ -1212,24 +1220,138 @@ void ccsd_restr(systeminfo* sysinfo,OEints* onemats,pHF* postHF){
                     Kicka[i*K_istep + c*K_cstep + k*K_kstep + a] = postHF->prec_ints[i*istep + k*jstep + tmpa*kstep + tmpc];
                     for(int l=0;l<nocc;l++){
                         //(ikcl)T1[la]
-                        Kicka[i*K_istep + c*K_cstep + k*K_kstep + a] -=postHF->prec_ints[i*istep + k*jstep + tmpc*kstep + l]*CC->T1[l*nvir+a];
+                        Kicka[i*K_istep + c*K_cstep + k*K_kstep + a] -= postHF->prec_ints[i*istep + k*jstep + tmpc*kstep + l]*CC->T1[l*nvir+a];
                     }
                     for(int d=0;d<nvir;d++){
                         //(dkac)*T1[id]
                         tmpd = d+nocc;
-                        Kicka[i*K_istep + c*K_cstep + k*K_kstep + a] +=postHF->prec_ints[tmpd*istep + k*jstep + tmpa*kstep + tmpc]*CC->T1[i*nvir+d];
+                        Kicka[i*K_istep + c*K_cstep + k*K_kstep + a] += postHF->prec_ints[tmpd*istep + k*jstep + tmpa*kstep + tmpc]*CC->T1[i*nvir+d];
                     }
                     for (int d=0;d<nvir;d++)
-                        for (int l=0;i<nocc;l++){
+                        for (int l=0;l<nocc;l++){
                             tmpd = d + nocc;
                             //1/2[(dkcl)](t2[ilda]*2T1[id]T1[la]
-                            Kicka[i*K_istep + c*K_cstep + k*K_kstep + a] -=0.5*postHF->prec_ints[tmpd*istep + k*jstep + tmpc*kstep + l]*(
+                            Kicka[i*K_istep + c*K_cstep + k*K_kstep + a] -= 0.5*postHF->prec_ints[tmpd*istep + k*jstep + tmpc*kstep + l]*(
                                         CC->T2[i*Ti_step + l*Tj_step + d*Ta_step+ a] + 2*CC->T1[i*nvir+d]*CC->T1[l*nvir+a]);
 
 
                         }
 
                 }
+
+
+    //update amplitudes
+
+
+    memset(r1   ,0 ,nocc*nvir*sizeof(double));
+    memset(r2   ,0 ,nocc*nocc*nvir*nvir*sizeof(double));
+    memset(Pijab,0 ,nocc*nocc*nvir*nvir*sizeof(double));
+
+    double* f = CC->f;
+
+    for(int i=0;i<nocc;i++)
+        for(int a=0;a<nvir;a++){
+            for(int c=0;c<nvir;c++){
+                r1[i*nvir +a] += Hca[c*nvir+a]*CC->T1[i*nvir+c];
+            }
+            for(int k=0;k<nocc;k++){
+                 r1[i*nvir +a] -= Hik[i*nocc+k]*CC->T1[k*nvir+a];
+            }
+            for(int c=0;c<nvir;c++)
+                for(int k=0;k<nocc;k++){
+                    r1[i*nvir +a] += Hck[c*nocc+k]*(2*CC->T2[k*Ti_step+i*Tj_step + c*Ta_step +a] - CC->T2[i*Ti_step+k*Tj_step + c*Ta_step +a] + CC->T1[i*nvir+c]*CC->T1[k*nvir+a]);
+                }
+            for(int c=0;c<nvir;c++)
+                for(int k=0;k<nocc;k++){
+                       tmpc = c+nocc;
+                       tmpa = a+nocc;
+                       // [2(ckai)-(ikac)]T1[kc]
+                       r1[i*nvir +a] += (2*postHF->prec_ints[tmpc*istep + k*jstep + tmpa*kstep + i]
+                                          -postHF->prec_ints[   i*istep + k*jstep + tmpa*kstep + tmpc])*CC->T1[k*nvir+c];
+            }
+
+            for(int c=0;c<nvir;c++)
+                for(int d=0;d<nvir;d++)
+                   for(int k=0;k<nocc;k++){
+                       tmpc = c+nocc;
+                       tmpa = a+nocc;
+                       tmpd = d+nocc;
+                       r1[i*nvir +a] += (2*postHF->prec_ints[tmpc*istep + k*jstep + tmpa*kstep + tmpd]
+                                          -postHF->prec_ints[tmpd*istep + k*jstep + tmpa*kstep + tmpc])*tau[k*Ti_step + i*Tj_step + c*Ta_step + d];
+                   }
+
+            for(int k=0;k<nocc;k++)
+                for(int l=0;l<nocc;l++)
+                    for(int c=0;c<nvir;c++){
+                        tmpc = c+nocc;
+                        r1[i*nvir +a] -= (2*postHF->prec_ints[tmpc*istep + k*jstep + i*kstep + l]
+                                           -postHF->prec_ints[tmpc*istep + l*jstep + i*kstep + k])*tau[k*Ti_step + l*Tj_step + c*Ta_step + a];
+
+                    }
+            r1[i*nvir +a]  /= ( f[i*nroao+i] -f[(nocc+a)*nroao +nocc+a]);
+            }
+
+    for(int i=0;i<nocc;i++)
+        for(int j=0;j<nocc;j++)
+            for(int a=0;a<nvir;a++)
+               for(int b=0;b<nvir;b++){
+                   tmpa = a+nocc;
+                   tmpb = b+nocc;
+                   r2[i*Ti_step+j*Tj_step+a*Ta_step+b] = postHF->prec_ints[i*istep + tmpa*jstep + j*kstep + tmpb];
+                   for(int k=0;k<nocc;k++)
+                       for(int l=0;l<nocc;l++){
+                          r2[i*Ti_step+j*Tj_step+a*Ta_step+b] += Aijkl[i*A_istep + j*A_jstep + k*A_kstep + l] * tau[k*Ti_step + l*Tj_step + a*Ta_step + b];
+                       }
+
+                   for(int c=0;c<nvir;c++)
+                       for(int d=0;d<nvir;d++){
+                            r2[i*Ti_step+j*Tj_step+a*Ta_step+b] += Bcdab[c*B_cstep + d*B_dstep + a*B_astep +b]* tau[i*Ti_step + j*Tj_step + c*Ta_step + d];
+                       }
+
+
+
+                   for(int c=0;c<nvir;c++){
+                       Pijab[i*Ti_step+j*Tj_step+a*Ta_step+b] += Gca[c*nvir +a]*CC->T2[i*Ti_step + j*Tj_step + c*Ta_step + b];
+                   }
+
+                   for(int k=0;k<nocc;k++){
+                       Pijab[i*Ti_step+j*Tj_step+a*Ta_step+b] -= Gik[i*nocc +k]*CC->T2[k*Ti_step + j*Tj_step + a*Ta_step + b];
+                   }
+                   for(int c=0;c<nvir;c++)
+                     for(int k=0;k<nocc;k++){
+                         tmpc = c + nocc;
+                         tmpb = b + nocc;
+                         tmpa = a + nocc;
+                         Pijab[i*Ti_step+j*Tj_step+a*Ta_step+b] += (postHF->prec_ints[i*istep + tmpa*jstep + tmpb*kstep + tmpc]
+                                                                   -postHF->prec_ints[i*istep + k*jstep    + tmpb*kstep + tmpc]*CC->T1[k*nvir+a])*CC->T1[j*nvir+c];
+
+                         Pijab[i*Ti_step+j*Tj_step+a*Ta_step+b] -= (postHF->prec_ints[tmpa*istep + i*jstep + j*kstep + k]
+                                                                   +postHF->prec_ints[tmpa*istep + i*jstep + tmpc*kstep + k]*CC->T1[j*nvir+c])*CC->T1[k*nvir+b];
+                         //(J[icak]-0.5K[icka])(2*T2[kjcb]-T2[kjbc])
+                         Pijab[i*Ti_step+j*Tj_step+a*Ta_step+b] += (Jicak[i*J_istep + c*J_cstep + a*J_astep + k ] - 0.5*Kicka[i*K_istep + c*K_cstep + k*K_kstep + a])*
+                                                                   (2*CC->T2[k*Ti_step + j*Tj_step + c*Ta_step + b] - CC->T2[k*Ti_step + j*Tj_step + b*Ta_step + c ]);
+
+                         Pijab[i*Ti_step+j*Tj_step+a*Ta_step+b] -= 0.5*(Kicka[i*K_istep + c*K_cstep + k*K_kstep +a]*CC->T2[k*Ti_step + j*Tj_step + b*Ta_step + c]);
+                         Pijab[i*Ti_step+j*Tj_step+a*Ta_step+b] -=     (Kicka[i*K_istep + c*K_cstep + k*K_kstep +b]*CC->T2[k*Ti_step + j*Tj_step + a*Ta_step + c]);
+
+                     }
+                   r2[i*Ti_step+j*Tj_step+a*Ta_step+b] += Pijab[i*Ti_step+j*Tj_step+a*Ta_step+b] + Pijab[j*Ti_step+i*Tj_step+b*Ta_step+a];
+
+                   r2[i*Ti_step+j*Tj_step+a*Ta_step+b] /=  (f[i*nroao+i]+f[j*nroao + j]-f[(nocc+a)*nroao+(nocc+a)]-f[(nocc+b)*nroao + nocc+b]);
+
+
+        }
+
+
+
+    double* swapper = CC->T2;
+    CC->T2  = r2;
+    r2 = swapper;
+    //swapper = CC->T1;
+    //CC->T1  = r1;
+    //r1 = swapper;
+}
+
 
 
 

@@ -38,6 +38,7 @@ void MOtrans_mod(systeminfo *sysinfo,OEints* onemats,TEints *twomats,pHF* postHF
     long long int prec_mem = (long long int) nroao*(long long int) nroao* (long long int) nroao* (long long int) nroao;
     // (ij|kl) <- (ab|cd)
     double* I_ibcd   = new double[nroao*nroao*nroao*nroao];
+    std::memset(I_ibcd,0,nroao*nroao*nroao*nroao*sizeof(double));
     int off_i;
 
     std::cout << "\nMOTRANS:\n-------" << '\n';
@@ -159,7 +160,7 @@ void MOtrans_mod(systeminfo *sysinfo,OEints* onemats,TEints *twomats,pHF* postHF
     }
     std::cout << "Done 4th index..\n";
 
-    delete[] I_ijkd;
+    delete[] I_ibcd;
 
 }
 
