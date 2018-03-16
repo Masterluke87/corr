@@ -10,15 +10,13 @@ plugin_load("./syshfwplug.so")
 
 
 molecule mymol {
-H  1.0 0.0 0.0
-H  0.0 1.0 0.0
-H -1.0 0.0 0.0
-H  0.0 -1.0 0.0
+H  
+H 1 1.0
 symmetry c1
 }
 
 set {
-  basis sto-3g
+  basis 3-21G
 }
 
 set syshfwplug {
