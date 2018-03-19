@@ -10,13 +10,13 @@ plugin_load("./syshfwplug.so")
 
 
 molecule mymol {
-H  
-H 1 1.0
+Au 
+Au 1 2.0
 symmetry c1
 }
 
 set {
-  basis 3-21G
+  basis def2-svp
 }
 
 set syshfwplug {
@@ -33,9 +33,9 @@ set scf reference rhf
 set scf_type pk
 set scf PRINT_MOS  true
 
-#e_scf,ref_wfn = energy('mp2',return_wfn=True)
+e_scf,ref_wfn = energy('scf',return_wfn=True)
 
-ref_wfn = psi4.core.Wavefunction.build(mymol , psi4.core.get_global_option('BASIS'))
+#ref_wfn = psi4.core.Wavefunction.build(mymol , psi4.core.get_global_option('BASIS'))
 aux     = psi4.core.BasisSet.build(mymol, "DF_BASIS_SCF", "", "JKFIT", psi4.core.get_global_option('BASIS'))
 aux2    = psi4.core.BasisSet.build(mymol, "DF_BASIS_MP2", "", "RIFIT", psi4.core.get_global_option('BASIS'))
 
@@ -43,6 +43,8 @@ ref_wfn.set_basisset("JKFIT",aux)
 ref_wfn.set_basisset("RIFIT",aux2)
 
 plugin("syshfwplug.so", ref_wfn)
+
+energy("ccsd(t)")
 
 #C = psi4.core.Matrix(ref_wfn.basisset().nbf(),ref_wfn.basisset().nbf())
 #df = psi4.core.DFTensor(ref_wfn.basisset(), aux, C, 5 , ref_wfn.basisset().nbf()-5 )

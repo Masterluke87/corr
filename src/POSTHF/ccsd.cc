@@ -1046,7 +1046,7 @@ void ccsd_restr(systeminfo* sysinfo,OEints* onemats,pHF* postHF){
     int J_cstep = J_astep*nvir;
     int J_istep = J_cstep*nvir;
 
-    for(int iter=0;iter<10;iter++){
+    for(int iter=0;iter<100;iter++){
 
     ccsd_energy_restr(CC,postHF);
 
@@ -1347,25 +1347,27 @@ void ccsd_restr(systeminfo* sysinfo,OEints* onemats,pHF* postHF){
         Pijab[i*Ti_step+j*Tj_step+a*Ta_step+b] -= Gik[i*nocc +k]*CC->T2[k*Ti_step + j*Tj_step + a*Ta_step + b];
     }
 
-    for(int c=0;c<nvir;c++)
-      for(int k=0;k<nocc;k++){
-          tmpc = c + nocc;
-          tmpb = b + nocc;
-          tmpa = a + nocc;
-          //P[ijab] += [(iabc)-(ikbc)*T1[ka]]T1[jc]
-          Pijab[i*Ti_step+j*Tj_step+a*Ta_step+b] += (postHF->prec_ints[i*istep + tmpa*jstep + tmpb*kstep + tmpc]
-                                                    -postHF->prec_ints[i*istep + k*jstep    + tmpb*kstep + tmpc]
-                                                     *CC->T1[k*nvir+a])
-                                                     *CC->T1[j*nvir+c];
-      }
-    for(int c=0;c<nvir;c++)
-      for(int k=0;k<nocc;k++){
-          //P[ijab] -= [(aijk)+(aick)*T1[jc]]*T1[kb]
-          tmpc = c + nocc;
-          Pijab[i*Ti_step+j*Tj_step+a*Ta_step+b] -= (postHF->prec_ints[tmpa*istep + i*jstep + j*kstep    + k]
-                                                    +postHF->prec_ints[tmpa*istep + i*jstep + tmpc*kstep + k]
-                                                    *CC->T1[j*nvir+c])*CC->T1[k*nvir+b];
+    for(int c=0;c<nvir;c++){
+        tmpc = c + nocc;
+        tmpb = b + nocc;
+        tmpa = a + nocc;
+        Pijab[i*Ti_step+j*Tj_step+a*Ta_step+b] += postHF->prec_ints[i*istep + tmpa*jstep + tmpb*kstep + tmpc] *CC->T1[j*nvir+c];
+        for(int k=0;k<nocc;k++){
+             Pijab[i*Ti_step+j*Tj_step+a*Ta_step+b] += -postHF->prec_ints[i*istep + k*jstep    + tmpb*kstep + tmpc]*CC->T1[k*nvir+a]*CC->T1[j*nvir+c];
+        }
     }
+    double s1 = 0.0;
+    for(int k=0;k<nocc;k++){
+        s1 = 0.0;
+        for(int c=0;c<nvir;c++){
+            tmpc = c+ nocc;
+            s1 += postHF->prec_ints[tmpa*istep + i*jstep + tmpc*kstep + k]*CC->T1[j*nvir+c];
+        }
+        //P[ijab] -= [(aijk)+(aick)*T1[jc]]*T1[kb]
+        Pijab[i*Ti_step+j*Tj_step+a*Ta_step+b] -= (postHF->prec_ints[tmpa*istep + i*jstep + j*kstep    + k] + s1
+                                                    )*CC->T1[k*nvir+b];
+    }
+
     for(int c=0;c<nvir;c++)
       for(int k=0;k<nocc;k++){
           //P[ijab] +=(J[icak]-0.5K[icka])(2*T2[kjcb]-T2[kjbc])
@@ -1430,7 +1432,7 @@ void ccsd_restr(systeminfo* sysinfo,OEints* onemats,pHF* postHF){
     swapper = CC->T1;
     CC->T1  = r1;
     r1 = swapper;
-
+/*
     std::cout<<"T1:\n";
     for (int i=0;i<nocc;i++)
         for (int a=0;a<nvir;a++){
@@ -1451,7 +1453,7 @@ void ccsd_restr(systeminfo* sysinfo,OEints* onemats,pHF* postHF){
                     }
                 }
 
-
+*/
 }
 
 

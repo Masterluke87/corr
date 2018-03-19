@@ -546,7 +546,7 @@ void run_export_mos(SharedWavefunction ref_wfn,std::string pref){
 	}
 	//maybe later
 	for(int x = 0; x < nroao; x++)
-		MOensA[x] = MOensB[x] = 0.;
+		MOensA[x] = MOensB[x] = 1.;
 
 	for(int x = 0; x < nroao; x++) {
 		for(int y = 0; y < nroao; y++) {
