@@ -35,9 +35,11 @@ add_executable(mp2 main.cc
       		    POSTHF/motrans.cc
                     POSTHF/loc_mp2.cc
                     POSTHF/can_mp2.cc
-                    POSTHF/ccsd_intermediates.cc
                     POSTHF/ri.cc
-                    POSTHF/ccsd.cc
+                    POSTHF/ccsd_restr/ccsd_restr.cc
+                    POSTHF/ccsd_restr/ccsd_intermediates_restr.cc
+                    POSTHF/ccsd_so/ccsd_so.cc
+                    POSTHF/ccsd_so/ccsd_intermediates.cc
                     POSTHF/ccsd_ri.cc
                     IO/ops_io.cc
                     MATH/ops_mat.cc

@@ -246,15 +246,19 @@ void run_scf(systeminfo *sysinfo,OEints *onemats,TEints* twomats){
                 int d_size = (diis_size+1);
                 int dd = nroao*nroao;
                 int inc = 1;
+                double maxel = 0.0;
                 for (int i=0; i<diis_size; i++) {
                     for (int j=0; j<diis_size; j++) {
                         B[i*d_size + j] = ddot_(&dd,diis_[i].second,&inc,diis_[j].second,&inc);
+
                     }
                     B[i*d_size + d_size-1] = -1;
                     B[(d_size-1)*d_size+i] = -1;
                     c[i] = 0.0;
 
                 }
+
+
                 B[d_size*d_size-1] = 0.0;
                 c[d_size-1] = -1;
 

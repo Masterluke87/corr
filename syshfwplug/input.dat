@@ -10,15 +10,16 @@ plugin_load("./syshfwplug.so")
 
 
 molecule mymol {
-Au 
-Au 1 2.0
+H
+H 1 1.0
 symmetry c1
 }
 
 set {
-  basis def2-svp
+  basis sto-3g
 }
-
+set ccenergy e_convergence 1E-12
+set ccenergy r_convergence 1E-12
 set syshfwplug {
   pref mytest
   dryrun false
